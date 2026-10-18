@@ -29,6 +29,7 @@ public partial class App : Application
     private RegisteredWaitHandle? _showWait;
     private TrayIcon? _trayIcon;
     private TrayIconRenderer? _trayRenderer;
+    private SessionWatcher? _session;
     private TrayFlyoutWindow? _flyout;
     private DispatcherQueue? _dispatcher;
     private PrinterHub? _hub;
@@ -139,11 +140,19 @@ public partial class App : Application
         _trayIcon.IsVisible = true;
         _trayRenderer = new TrayIconRenderer(_trayIcon, DispatcherQueue.GetForCurrentThread());
         WindowPlacementService.SetTrayIcon(_trayIcon);
-        SystemThemeService.Changed += (_, _) => _dispatcher?.TryEnqueue(() =>
-        {
-            _trayRenderer?.Invalidate();
-            UpdateTrayIcon();
-        });
+        SystemThemeService.Changed += (_, _) => _dispatcher?.TryEnqueue(RedrawTrayIcon);
+        MotionService.Changed += (_, _) => _dispatcher?.TryEnqueue(RedrawTrayIcon);
+
+        // Nobody to see the marquee while the session is locked or the screen is off.
+        SessionWatcher session = _session = new SessionWatcher();
+        session.Changed += (_, _) => _trayRenderer?.Away = session.IsAway;
+        _trayRenderer.Away = session.IsAway;
+    }
+
+    private void RedrawTrayIcon()
+    {
+        _trayRenderer?.Invalidate();
+        UpdateTrayIcon();
     }
 
     // A white glyph disappears on a light taskbar, which follows the Windows theme, not the app theme.
@@ -248,6 +257,8 @@ public partial class App : Application
         // Stop the marquee first, so no frame lands on a disposed icon.
         _trayRenderer?.Dispose();
         _trayRenderer = null;
+        _session?.Dispose();
+        _session = null;
         if (_trayIcon is not null)
         {
             _trayIcon.IsVisible = false;
