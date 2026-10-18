@@ -39,6 +39,13 @@ internal static class SettingsService
         set => SetJson(nameof(Printers), [.. value], SettingsJsonContext.Default.ListPrinterConfig);
     }
 
+    /// <summary>Ids of printers whose finished print hasn't been marked complete, so the tray stays green across restarts.</summary>
+    public static IReadOnlyList<string> NeedsMarkComplete
+    {
+        get => GetJson(nameof(NeedsMarkComplete), SettingsJsonContext.Default.ListString) ?? [];
+        set => SetJson(nameof(NeedsMarkComplete), [.. value], SettingsJsonContext.Default.ListString);
+    }
+
     /// <summary>How often to check a printer while it prints, snapped to the offered choices.</summary>
     public static TimeSpan ActiveInterval
     {
@@ -119,4 +126,5 @@ internal static class SettingsService
 
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(List<PrinterConfig>))]
+[JsonSerializable(typeof(List<string>))]
 internal sealed partial class SettingsJsonContext : JsonSerializerContext;

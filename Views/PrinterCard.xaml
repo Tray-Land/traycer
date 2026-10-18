@@ -139,8 +139,32 @@
                         Style="{StaticResource CaptionTextBlockStyle}"
                         TextWrapping="Wrap"
                         Visibility="Collapsed" />
+
+                    <!--  Room for CompleteButton, which sits over this spot  -->
+                    <Border
+                        x:Name="CompleteSpacer"
+                        Height="32"
+                        Margin="0,6,0,0"
+                        Visibility="Collapsed" />
                 </StackPanel>
             </Grid>
+        </Button>
+
+        <!--  Over the card rather than in it: a button can't hold a button. The margin is the card's padding plus border.  -->
+        <Button
+            x:Name="CompleteButton"
+            Height="32"
+            Margin="0,0,13,11"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            AutomationProperties.Name="Mark as complete"
+            Click="CompleteButton_Click"
+            Style="{StaticResource AccentButtonStyle}"
+            Visibility="Collapsed">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon FontSize="14" Glyph="&#xE73E;" />
+                <TextBlock Text="Mark as complete" />
+            </StackPanel>
         </Button>
     </Grid>
 </UserControl>

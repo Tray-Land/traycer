@@ -53,6 +53,7 @@ public sealed partial class PrinterCard : UserControl, IDisposable
         Show(MessageText, MessageFor(status, now));
         Show(FactsText, snapshot is null ? null : Facts(snapshot));
         _thumbnail.Load(_printerId, snapshot?.ThumbnailUrl);
+        CompleteSpacer.Visibility = CompleteButton.Visibility = status.NeedsMarkComplete ? Visibility.Visible : Visibility.Collapsed;
 
         // Read the card the way it looks: name, state, then whatever lines are showing.
         List<string> spoken = [status.Config.Name, StateText.Text];
@@ -105,6 +106,12 @@ public sealed partial class PrinterCard : UserControl, IDisposable
         if (status.Connection is ConnectionState.Connecting or ConnectionState.Unreachable)
         {
             return "Dim";
+        }
+
+        // Printers that drop straight back to idle still look finished until the print is marked complete.
+        if (status.NeedsMarkComplete && status.DisplayState == PrinterState.Idle)
+        {
+            return "Success";
         }
 
         return status.DisplayState switch
@@ -165,4 +172,11 @@ public sealed partial class PrinterCard : UserControl, IDisposable
     }
 
     private void CardButton_Click(object sender, RoutedEventArgs e) => Invoked?.Invoke(this, _printerId);
+
+    private void CompleteButton_Click(object sender, RoutedEventArgs e)
+    {
+        // The button hides with the flag; keep focus on the card instead of losing it.
+        CardButton.Focus(FocusState.Programmatic);
+        App.Current.Hub.MarkComplete(_printerId);
+    }
 }

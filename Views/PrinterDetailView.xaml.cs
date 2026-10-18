@@ -84,6 +84,7 @@ public sealed partial class PrinterDetailView : UserControl, IFlyoutView, IDispo
 
         SetText(TimeText, snapshot is null ? null : TimeLine(snapshot, now));
         ShowMessage(status);
+        CompleteButton.Visibility = status.NeedsMarkComplete ? Visibility.Visible : Visibility.Collapsed;
         _thumbnail.Load(_printerId, snapshot?.ThumbnailUrl);
 
         Fill(TemperatureSection, TemperatureRows, snapshot?.Temperatures.Select(t => (t.Label, TemperatureText(t), (string?)null)) ?? []);
@@ -204,6 +205,13 @@ public sealed partial class PrinterDetailView : UserControl, IFlyoutView, IDispo
     private void Hub_Changed(object? sender, EventArgs e) => Render();
 
     private void BackButton_Click(object sender, RoutedEventArgs e) => _host.GoBack();
+
+    private void CompleteButton_Click(object sender, RoutedEventArgs e)
+    {
+        // The button hides with the flag; keep focus in the page instead of losing it.
+        BackButton.Focus(FocusState.Programmatic);
+        App.Current.Hub.MarkComplete(_printerId);
+    }
 
     private async void WebButton_Click(object sender, RoutedEventArgs e)
     {

@@ -23,6 +23,9 @@ internal sealed class PrinterHub
     private readonly Dictionary<string, PrinterMonitor> _monitors = [];
     private readonly Dictionary<string, PrinterStatus> _statuses = [];
     private readonly Dictionary<string, byte[]?> _thumbnails = [];
+
+    // Printers with a finished print to mark complete; saved, so it outlives restarts and edits.
+    private readonly HashSet<string> _needsMarkComplete = [];
     private bool _foreground;
 
     public PrinterHub(DispatcherQueue dispatcher)
@@ -44,6 +47,7 @@ internal sealed class PrinterHub
 
     public void Start()
     {
+        _needsMarkComplete.UnionWith(SettingsService.NeedsMarkComplete);
         foreach (PrinterConfig config in PrinterStore.All)
         {
             StartMonitor(config);
@@ -93,6 +97,22 @@ internal sealed class PrinterHub
         {
             Changed?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    /// <summary>The user has dealt with a finished print: the tray goes back to normal for this printer.</summary>
+    public void MarkComplete(string id)
+    {
+        if (_monitors.GetValueOrDefault(id) is { } monitor)
+        {
+            _statuses[id] = monitor.MarkComplete();
+        }
+        else if (_statuses.GetValueOrDefault(id) is { } status)
+        {
+            _statuses[id] = status with { NeedsMarkComplete = false };
+        }
+
+        RememberNeedsMarkComplete(id, false);
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public Uri? WebInterface(string id) => _monitors.GetValueOrDefault(id)?.Driver.WebInterface;
@@ -146,6 +166,7 @@ internal sealed class PrinterHub
 
     private void StartMonitor(PrinterConfig config)
     {
+        bool needsMarkComplete = _needsMarkComplete.Contains(config.Id);
         IPrinterDriver driver;
         try
         {
@@ -153,11 +174,17 @@ internal sealed class PrinterHub
         }
         catch (Exception ex) when (ex is FormatException or NotSupportedException)
         {
-            _statuses[config.Id] = new PrinterStatus { Config = config, Connection = ConnectionState.Incompatible, Problem = "The printer's address isn't valid. Edit it." };
+            _statuses[config.Id] = new PrinterStatus
+            {
+                Config = config,
+                Connection = ConnectionState.Incompatible,
+                Problem = "The printer's address isn't valid. Edit it.",
+                NeedsMarkComplete = needsMarkComplete,
+            };
             return;
         }
 
-        PrinterMonitor monitor = new(config, driver, CurrentOptions()) { Foreground = _foreground };
+        PrinterMonitor monitor = new(config, driver, CurrentOptions(), needsMarkComplete: needsMarkComplete) { Foreground = _foreground };
         monitor.Updated += OnMonitorUpdated;
         _monitors[config.Id] = monitor;
         _statuses[config.Id] = monitor.Status;
@@ -194,7 +221,11 @@ internal sealed class PrinterHub
             return; // Replaced or removed while the update was in flight.
         }
 
-        _statuses[update.Status.Config.Id] = update.Status;
+        // The monitor's latest, not the update's: the user may have acknowledged or marked the
+        // print complete while this was queued, and the update would bring the flag back.
+        PrinterStatus status = monitor.Status;
+        _statuses[status.Config.Id] = status;
+        RememberNeedsMarkComplete(status.Config.Id, status.NeedsMarkComplete);
         if (update.Event is { } printEvent)
         {
             PrintEventRaised?.Invoke(this, (update.Status, printEvent));
@@ -208,10 +239,22 @@ internal sealed class PrinterHub
         StopMonitor(id);
         if (PrinterStore.Find(id) is { } config)
         {
-            StartMonitor(config);
+            StartMonitor(config); // An edit keeps a finished print waiting to be marked complete.
+        }
+        else
+        {
+            RememberNeedsMarkComplete(id, false);
         }
 
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void RememberNeedsMarkComplete(string id, bool needed)
+    {
+        if (needed ? _needsMarkComplete.Add(id) : _needsMarkComplete.Remove(id))
+        {
+            SettingsService.NeedsMarkComplete = [.. _needsMarkComplete];
+        }
     }
 
     private void OnMonitoringChanged(object? sender, EventArgs e)
