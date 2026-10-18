@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "TrayCer (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "TrayCer (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
