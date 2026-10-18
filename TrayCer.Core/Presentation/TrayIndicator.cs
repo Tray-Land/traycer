@@ -11,6 +11,9 @@ public enum TrayGlyph
     /// <summary>A print's percentage over a progress bar.</summary>
     Progress,
 
+    /// <summary>A hotend over a bar that fills as the heaters warm up: a print is getting ready.</summary>
+    Heating,
+
     /// <summary>Pause bars over a progress bar.</summary>
     Paused,
 
@@ -34,13 +37,21 @@ public sealed record TrayIndicator(TrayGlyph Glyph, double? Progress, string Too
     public const int MaxTooltipLength = 127; // NOTIFYICONDATA.szTip
 
     /// <summary>
-    /// One icon for many printers, most urgent first: errors, then waiting-on-you, then finished
-    /// and not yet marked complete, then a paused print, then the print that will finish soonest.
+    /// A print is waiting to be marked complete, even while something more urgent has the icon.
+    /// When this turns false the plate has been cleared, and the finished tile slides away.
     /// </summary>
-    public static TrayIndicator Compute(IReadOnlyList<PrinterStatus> printers, string appName)
-    {
-        string tooltip = BuildTooltip(printers, appName);
+    public bool HasFinished { get; init; }
 
+    /// <summary>
+    /// One icon for many printers, most urgent first: errors, then waiting-on-you, then finished
+    /// and not yet marked complete, then a paused print, then the print that will finish soonest
+    /// (or, before any print is under way, the heaters warming up for one).
+    /// </summary>
+    public static TrayIndicator Compute(IReadOnlyList<PrinterStatus> printers, string appName) =>
+        Choose(printers, BuildTooltip(printers, appName)) with { HasFinished = printers.Any(p => p.NeedsMarkComplete) };
+
+    private static TrayIndicator Choose(IReadOnlyList<PrinterStatus> printers, string tooltip)
+    {
         if (printers.Any(p => p.Attention == AttentionLevel.Error))
         {
             return new TrayIndicator(TrayGlyph.Error, null, tooltip);
@@ -63,10 +74,15 @@ public sealed record TrayIndicator(TrayGlyph Glyph, double? Progress, string Too
             return new TrayIndicator(TrayGlyph.Paused, paused.Snapshot!.Progress, tooltip);
         }
 
-        PrinterStatus? next = Printing(printers).FirstOrDefault();
-        return next is not null
-            ? new TrayIndicator(TrayGlyph.Progress, next.Snapshot!.Progress, tooltip)
-            : new TrayIndicator(TrayGlyph.App, null, tooltip);
+        if (Printing(printers).FirstOrDefault()?.Snapshot is not { } next)
+        {
+            return new TrayIndicator(TrayGlyph.App, null, tooltip);
+        }
+
+        // Preparing sorts last, so this is the case only when nothing is printing yet.
+        return next.State == PrinterState.Preparing && next.HeatProgress is { } heat
+            ? new TrayIndicator(TrayGlyph.Heating, heat, tooltip)
+            : new TrayIndicator(TrayGlyph.Progress, next.Progress, tooltip);
     }
 
     /// <summary>Printing printers, soonest to finish first; those without an estimate go by progress.</summary>

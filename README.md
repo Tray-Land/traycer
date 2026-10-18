@@ -1,10 +1,10 @@
 # Traycer
 
-![Tray icon states: a percentage over a progress bar, yellow pause bars, a green tile with a printer's name scrolling across it, a red exclamation mark](docs/tray-states.png)
+![Tray icon states: a percentage over a progress bar, a hotend over an amber bar that fills as the heaters warm up, yellow pause bars, a green tile with a printer's name coming out from under a print head, a red exclamation mark](docs/tray-states.png)
 
 Glance at the tray to see how your 3D prints are going, and whether anything has finished.
 
-Traycer is a WinUI 3 app that lives in the Windows notification area. It watches the printers on your network and draws the state of the most pressing one right on its tray icon: the percentage of the print that will finish first, pause bars when a print is waiting, a green tile with the printer's name scrolling across it when a print is done and waiting for you, and a red mark when something failed. Click the icon for a card per printer.
+Traycer is a WinUI 3 app that lives in the Windows notification area. It watches the printers on your network and draws the state of the most pressing one right on its tray icon: the percentage of the print that will finish first, a hotend while the heaters warm up for one, pause bars when a print is waiting, a green tile with the printer's name scrolling across it when a print is done and waiting for you, and a red mark when something failed. Click the icon for a card per printer.
 
 ## Supported printers
 
@@ -28,12 +28,13 @@ Traycer talks to each printer the way its own software does, on your local netwo
 
 ## Features
 
-- **Tray icon:** one icon for all your printers, most urgent first: a failed print or printer error (red !), a printer waiting on you (amber !), a finished print you haven't marked complete (a green tile with `Voron done` scrolling across it, naming every printer that's done), a paused print (pause bars over its progress), then the percentage of the print that will finish soonest. With nothing going on, it's the plain app icon. It follows the taskbar's light or dark theme and renders at your display's DPI.
+- **Tray icon:** one icon for all your printers, most urgent first: a failed print or printer error (red !), a printer waiting on you (amber !), a finished print you haven't marked complete (a green tile with `Voron done` scrolling across it, naming every printer that's done), a paused print (pause bars over its progress), then the percentage of the print that will finish soonest. Before any print is under way, a hotend over an amber bar shows the heaters warming up, the bar filling as they near their targets. With nothing going on, it's the plain app icon. It follows the taskbar's light or dark theme and renders at your display's DPI.
+- **A little motion:** at 125% display scale and up, the finished tile's text comes out from under a print head, like a belt printer laying it down. When you mark the last finished print complete, the tile slides out of the icon like a plate pulled from the printer.
 - **Tooltip:** a line per printer that has news, like `P1S: Finished` or `Voron: 45% · 1h 20m left`.
-- **Cards:** the flyout has a card per printer: name, state, job name, progress bar, time left and the clock time it should be done, layer, temperatures, the printer's own status message, and a preview image when the printer serves one.
-- **Details:** click a card for everything the printer reports, grouped into temperatures (with targets), details (speed, filament, nozzle and so on) and the printer itself. Open its web interface (Mainsail, Fluidd, OctoPrint, PrusaLink, Duet Web Control), edit it or remove it.
+- **Cards:** the flyout has a card per printer: name, state, job name, progress bar, time left and the clock time it should be done, layer, temperatures, the printer's own status message, and a preview image when the printer serves one. The preview builds up from the bottom as the print goes (by layer, when the printer reports layers), with the rest of the part ghosted above a line at the layer being printed. While it prints, a glowing nozzle rides the end of the progress bar.
+- **Details:** click a card for everything the printer reports, grouped into temperatures (with targets, and an amber bar under each heater while it warms up), details (speed, filament, nozzle and so on) and the printer itself. Open its web interface (Mainsail, Fluidd, OctoPrint, PrusaLink, Duet Web Control), edit it or remove it.
 - **Notifications:** a Windows notification when a print finishes, fails, pauses or needs you. One per printer, replaced rather than piled up, and cleared when you open the flyout. Each kind can be turned off in Settings.
-- **Mark as complete:** a finished print keeps the tray icon green until you press **Mark as complete** on its card (or on its details page), so a print never sits forgotten on the plate. Starting the next print on that printer clears it too. It survives restarting the app and editing the printer.
+- **Mark as complete:** a finished print keeps the tray icon green until you press **Mark as complete** on its card (or on its details page), so a print never sits forgotten on the plate. Pressing it scrapes the card clean and slides the part off the preview, leaving an empty plate. Starting the next print on that printer clears it too. It survives restarting the app and editing the printer.
 - **Seen it:** opening the flyout counts as seeing failures and warnings, so the tray icon goes back to showing progress.
 - **Find printers:** scans your network. Bambu Lab, Elegoo and FlashForge printers announce themselves; OctoPrint, Moonraker (with zeroconf) and UltiMaker printers are found over mDNS. Pick one and the form is filled in.
 - **Add by address:** type an IP address or host name and press **Detect**: Traycer works out what's there and fills in the type, and the serial number for Bambu Lab and FlashForge. The form asks only for what that type needs, and **Test connection** says what the printer reports before you save.
@@ -66,7 +67,7 @@ Windows puts a new app's tray icon in the overflow (^). Since the icon is the po
 - **Certificates.** Printers that use TLS present certificates Windows can't verify (Bambu Lab's come from Bambu's own authority). Traycer accepts them for Bambu's MQTT connection, and for HTTPS only when the address is a private IP or a `.local`/`.lan` name.
 - **Polling.** The tray icon is the reason Traycer keeps watching with no window open. A printing printer is checked every 15 seconds (configurable), an idle one once a minute, and an unreachable one backs off to every five minutes. Bambu, Creality and Elegoo printers keep a connection open while they print and drop it while idle, checking back every three minutes.
 - **Memory.** The flyout is hidden when dismissed and closed a minute later, then the app returns its memory to Windows.
-- **Animation.** The scrolling tray icon redraws about 18 times a second, and only while a finished print waits to be marked complete. Each frame is cut from text rendered once, so it costs well under 1% of one CPU core.
+- **Animation.** The scrolling tray icon redraws about 18 times a second, only while a finished print waits to be marked complete, and holds still while your session is locked or the screen is off. Each frame is cut from text rendered once, so it costs well under 1% of one CPU core. Everything else that moves either lasts a fraction of a second or runs only while the flyout is open. With Windows' animation effects off (Settings > Accessibility > Visual effects), the tray shows a plain check mark instead of the scrolling tile, and nothing in the flyout moves.
 
 ## Build from source
 
@@ -82,13 +83,13 @@ The app has no keys of its own, so there's nothing to configure. Package identit
 
 ### No printer? Fake ones
 
-`scripts/FakePrinters.cs` runs six fake printers on `127.0.0.1`, each mid-print: Bambu Lab (MQTT over TLS, with announcements on the network), Klipper, OctoPrint, Creality, Elegoo (WebSocket and UDP discovery) and FlashForge (HTTP and UDP discovery).
+`scripts/FakePrinters.cs` runs six fake printers on `127.0.0.1`, each partway through a scripted print (40 seconds of warming up, then a few minutes of printing): Bambu Lab (MQTT over TLS, with announcements on the network), Klipper, OctoPrint, Creality, Elegoo (WebSocket and UDP discovery) and FlashForge (HTTP and UDP discovery).
 
 ```powershell
 dotnet run --file scripts/FakePrinters.cs
 ```
 
-The addresses, serial numbers and codes are at the top of the file. Steer the scripted prints at `http://localhost:7999`: `/status`, `/reset?p=all`, `/pause?p=bambu`, `/finish?p=octoprint`, `/error?p=klipper`, `/idle?p=creality`.
+The addresses, serial numbers and codes are at the top of the file. Steer the scripted prints at `http://localhost:7999`: `/status`, `/reset?p=all`, `/pause?p=bambu`, `/finish?p=octoprint`, `/error?p=klipper`, `/cancel?p=elegoo`, `/idle?p=creality`.
 
 ### Releases
 

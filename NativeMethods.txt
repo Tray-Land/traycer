@@ -1,7 +1,9 @@
 AllowSetForegroundWindow
 APPBARDATA
 CreateIconFromResourceEx
+CreateWindowEx
 DestroyIcon
+DestroyWindow
 DwmSetWindowAttribute
 DWM_WINDOW_CORNER_PREFERENCE
 GetAncestor
@@ -14,8 +16,10 @@ GetDpiForWindow
 GetForegroundWindow
 GetSystemMetricsForDpi
 GetWindowLong
+GUID_SESSION_DISPLAY_STATUS
 MonitorFromPoint
 NOTIFYICONIDENTIFIER
+RegisterPowerSettingNotification
 RegNotifyChangeKeyValue
 SetForegroundWindow
 SetLayeredWindowAttributes
@@ -23,3 +27,6 @@ SetProcessWorkingSetSize
 SetWindowLong
 SHAppBarMessage
 Shell_NotifyIconGetRect
+UnregisterPowerSettingNotification
+WTSRegisterSessionNotification
+WTSUnRegisterSessionNotification

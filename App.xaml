@@ -48,6 +48,14 @@
                 TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
             </Style>
+            <!--  A heater's climb to its target, under its temperature row; amber, like the tray icon's warming bar.  -->
+            <Style
+                x:Key="HeaterBarStyle"
+                BasedOn="{StaticResource DefaultProgressBarStyle}"
+                TargetType="ProgressBar">
+                <Setter Property="Maximum" Value="1" />
+                <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+            </Style>
             <Style x:Key="SwatchStyle" TargetType="Ellipse">
                 <Setter Property="Width" Value="10" />
                 <Setter Property="Height" Value="10" />

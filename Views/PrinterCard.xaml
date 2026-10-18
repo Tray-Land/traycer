@@ -2,6 +2,7 @@
 <UserControl
     x:Class="TrayCer.Views.PrinterCard"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:local="using:TrayCer.Views"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid>
@@ -57,7 +58,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!--  Job preview, only for printers that serve one  -->
+                <!--  Job preview, only for printers that serve one, built up as the print goes  -->
                 <Border
                     x:Name="ThumbnailFrame"
                     Width="56"
@@ -66,7 +67,7 @@
                     Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                     CornerRadius="4"
                     Visibility="Collapsed">
-                    <Image x:Name="Thumbnail" Stretch="Uniform" />
+                    <local:BuildPreview x:Name="Thumbnail" />
                 </Border>
 
                 <StackPanel Grid.Column="1" Spacing="2">
@@ -112,10 +113,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <ProgressBar
-                            x:Name="Progress"
-                            VerticalAlignment="Center"
-                            Maximum="100" />
+                        <local:PrintProgressBar x:Name="Progress" VerticalAlignment="Center" />
                         <TextBlock
                             x:Name="PercentText"
                             Grid.Column="1"
@@ -149,6 +147,9 @@
                 </StackPanel>
             </Grid>
         </Button>
+
+        <!--  Scraped off the card when the print is marked complete  -->
+        <local:PlateWipe x:Name="Wipe" />
 
         <!--  Over the card rather than in it: a button can't hold a button. The margin is the card's padding plus border.  -->
         <Button

@@ -5,7 +5,7 @@
 //
 //   dotnet run --file scripts/FakePrinters.cs     (from the repo root; --file, or it runs the app)
 //
-// Every printer runs a scripted print on localhost (about 8 s heating, then printing), each at
+// Every printer runs a scripted print on localhost (40 s heating, then printing), each at
 // its own pace so they finish at different times. Add them in Traycer by address:
 //
 //   Bambu Lab        127.0.0.1          serial 01P00A391800123, access code 12345678
@@ -17,7 +17,8 @@
 //
 // "Find printers" sees the Bambu (NOTIFY to UDP 2021), Elegoo (UDP 3000) and FlashForge
 // (UDP 48899) printers. Control the scripts at http://localhost:7999:
-//   /status, /reset?p=all, /pause?p=bambu, /finish?p=octoprint, /error?p=klipper, /idle?p=creality
+//   /status, /reset?p=all, /pause?p=bambu, /finish?p=octoprint, /error?p=klipper, /cancel?p=elegoo,
+//   /idle?p=creality. A cancelled print stops where it got to, the way each protocol reports one.
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Net;
@@ -57,7 +58,7 @@ app.MapGet("/printer/objects/list", () => Json(JsonNode.Parse("""{"result":{"obj
 app.MapGet("/printer/objects/query", () =>
 {
     Job job = jobs["klipper"];
-    string state = job.Phase switch { "idle" => "standby", "paused" => "paused", "done" => "complete", "error" => "error", _ => "printing" };
+    string state = job.Phase switch { "idle" => "standby", "paused" => "paused", "done" => "complete", "error" => "error", "cancelled" => "cancelled", _ => "printing" };
     bool error = job.Phase == "error";
     JsonObject status = new()
     {
@@ -92,7 +93,8 @@ app.MapGet("/api/job", (HttpRequest request) =>
     }
 
     Job job = jobs["octoprint"];
-    string state = job.Phase switch { "idle" or "done" => "Operational", "paused" => "Paused", "error" => "Offline after error", _ => "Printing" };
+    // After a cancel OctoPrint is just "Operational" again, with the job still loaded short of 100%.
+    string state = job.Phase switch { "idle" or "done" or "cancelled" => "Operational", "paused" => "Paused", "error" => "Offline after error", _ => "Printing" };
     return Json(new JsonObject
     {
         ["job"] = new JsonObject
@@ -171,7 +173,7 @@ app.MapPost("/detail", async (HttpRequest request) =>
     }
 
     Job job = jobs["flashforge"];
-    string status = job.Phase switch { "heating" => "heating", "printing" => "printing", "paused" => "paused", "done" => "completed", "error" => "error", _ => "ready" };
+    string status = job.Phase switch { "heating" => "heating", "printing" => "printing", "paused" => "paused", "done" => "completed", "error" => "error", "cancelled" => "cancel", _ => "ready" };
     return Json(new JsonObject
     {
         ["code"] = 0,
@@ -199,6 +201,7 @@ app.MapGet("/{action}", (string action, string? p) =>
             case "pause": job.TogglePause(); break;
             case "finish": job.FinishSoon(); break;
             case "error": job.Error = !job.Error; break;
+            case "cancel": job.Cancel(); break;
             case "idle": job.Idle = !job.Idle; break;
             default: return Results.NotFound();
         }
@@ -239,7 +242,7 @@ static async Task CrealitySession(WebSocket socket, Job job, CancellationToken c
 {
     JsonObject Full() => new()
     {
-        ["model"] = "K1C", ["hostname"] = "K1C-7A21", ["state"] = job.Phase switch { "printing" => 1, "heating" => 0, "paused" => 5, "done" => 2, _ => 0 },
+        ["model"] = "K1C", ["hostname"] = "K1C-7A21", ["state"] = job.Phase switch { "printing" => 1, "heating" => 0, "paused" => 5, "done" => 2, "cancelled" => 4, _ => 0 },
         ["printFileName"] = job.Phase == "idle" ? "" : job.File, ["printProgress"] = (int)(job.Progress * 100), ["printJobTime"] = (int)job.Elapsed,
         ["printLeftTime"] = ((int)job.Remaining).ToString(), ["layer"] = (int)(job.Progress * 60), ["TotalLayer"] = 60,
         ["nozzleTemp"] = job.Nozzle(220).ToString("0.00"), ["targetNozzleTemp"] = job.Heating ? 220 : 0, ["bedTemp0"] = job.Bed(60).ToString("0.00"),
@@ -290,12 +293,12 @@ static async Task SdcpSession(WebSocket socket, Job job, CancellationToken cance
     const string id = "8e3e4f0d0a090f0a";
     string Status()
     {
-        int code = job.Phase switch { "heating" => 16, "printing" => 13, "paused" => 6, "done" => 9, "error" => 14, _ => 0 };
+        int code = job.Phase switch { "heating" => 16, "printing" => 13, "paused" => 6, "done" => 9, "error" => 14, "cancelled" => 8, _ => 0 };
         JsonObject message = new()
         {
             ["Status"] = new JsonObject
             {
-                ["CurrentStatus"] = new JsonArray(job.Phase is "idle" or "done" ? 0 : 1),
+                ["CurrentStatus"] = new JsonArray(job.Phase is "idle" or "done" or "cancelled" ? 0 : 1),
                 ["TempOfNozzle"] = job.Nozzle(220), ["TempTargetNozzle"] = job.Heating ? 220 : 0, ["TempOfHotbed"] = job.Bed(60), ["TempTargetHotbed"] = job.Heating ? 60 : 0,
                 ["TempOfBox"] = 31.2, ["TempTargetBox"] = 0,
                 ["PrintInfo"] = new JsonObject
@@ -387,14 +390,14 @@ static async Task BambuSession(Stream stream, Job job, CancellationToken stoppin
 
     JsonObject Report(bool full)
     {
-        string state = job.Phase switch { "heating" => "RUNNING", "printing" => "RUNNING", "paused" => "PAUSE", "done" => "FINISH", "error" => "FAILED", _ => "IDLE" };
+        string state = job.Phase switch { "heating" => "RUNNING", "printing" => "RUNNING", "paused" => "PAUSE", "done" => "FINISH", "error" or "cancelled" => "FAILED", _ => "IDLE" };
         JsonObject print = new()
         {
             ["command"] = "push_status", ["msg"] = full ? 0 : 1, ["sequence_id"] = "1",
             ["gcode_state"] = state, ["stg_cur"] = job.Phase switch { "heating" => 2, "paused" => 6, "printing" => 0, _ => 255 },
             ["mc_percent"] = (int)(job.Progress * 100), ["mc_remaining_time"] = (int)Math.Ceiling(job.Remaining / 60),
             ["layer_num"] = (int)(job.Progress * 180), ["nozzle_temper"] = job.Nozzle(220), ["bed_temper"] = job.Bed(55),
-            ["print_error"] = job.Phase == "error" ? 117473286 : 0,
+            ["print_error"] = job.Phase switch { "error" => 117473286, "cancelled" => 0x0300400C, _ => 0 }, // Cancelled: "0300-400C".
         };
         if (full)
         {
@@ -541,10 +544,11 @@ static byte[] FlashForgeDiscoveryReply()
     return reply;
 }
 
-/// <summary>A scripted print: heating, then printing at a steady rate, then done; pause, error and idle on demand.</summary>
+/// <summary>A scripted print: heating, then printing at a steady rate, then done; pause, error, cancel and idle on demand.</summary>
 sealed class Job(string file, double printSeconds, double startOffset)
 {
-    private const double HeatSeconds = 8;
+    // Long enough for a poll or two to catch the warm-up.
+    private const double HeatSeconds = 40;
 
     public string File { get; } = file;
 
@@ -557,11 +561,13 @@ sealed class Job(string file, double printSeconds, double startOffset)
     public bool Idle { get; set; }
 
     private DateTimeOffset? _pausedAt;
+    private DateTimeOffset? _cancelledAt;
     private TimeSpan _pausedTotal;
 
-    public double T => ((_pausedAt ?? DateTimeOffset.UtcNow) - Start - _pausedTotal).TotalSeconds;
+    // Paused or cancelled, the clock stops where the print got to.
+    public double T => ((_cancelledAt ?? _pausedAt ?? DateTimeOffset.UtcNow) - Start - _pausedTotal).TotalSeconds;
 
-    public string Phase => Idle ? "idle" : Error ? "error" : _pausedAt is not null ? "paused" : T < HeatSeconds ? "heating" : T < HeatSeconds + PrintSeconds ? "printing" : "done";
+    public string Phase => Idle ? "idle" : Error ? "error" : _cancelledAt is not null ? "cancelled" : _pausedAt is not null ? "paused" : T < HeatSeconds ? "heating" : T < HeatSeconds + PrintSeconds ? "printing" : "done";
 
     public bool Heating => Phase is "heating" or "printing" or "paused";
 
@@ -571,7 +577,8 @@ sealed class Job(string file, double printSeconds, double startOffset)
 
     public double Remaining => PrintSeconds - Elapsed;
 
-    public double Nozzle(double target) => Heating ? Math.Min(target, 25 + (Math.Max(0, T) * (target - 25) / HeatSeconds)) : 32;
+    // The nozzle is up to temperature well before the bed, as on a real printer.
+    public double Nozzle(double target) => Heating ? Math.Min(target, 25 + (Math.Max(0, T) * (target - 25) / (HeatSeconds * 0.6))) : 32;
 
     public double Bed(double target) => Heating ? Math.Min(target, 25 + (Math.Max(0, T) * (target - 25) / HeatSeconds)) : 28;
 
@@ -579,6 +586,7 @@ sealed class Job(string file, double printSeconds, double startOffset)
     {
         Start = DateTimeOffset.UtcNow;
         _pausedAt = null;
+        _cancelledAt = null;
         _pausedTotal = TimeSpan.Zero;
         Error = false;
         Idle = false;
@@ -586,6 +594,11 @@ sealed class Job(string file, double printSeconds, double startOffset)
 
     public void TogglePause()
     {
+        if (_cancelledAt is not null)
+        {
+            return;
+        }
+
         if (_pausedAt is { } at)
         {
             _pausedTotal += DateTimeOffset.UtcNow - at;
@@ -596,6 +609,9 @@ sealed class Job(string file, double printSeconds, double startOffset)
             _pausedAt = DateTimeOffset.UtcNow;
         }
     }
+
+    /// <summary>Stops the print for good, partway through; only a reset starts another.</summary>
+    public void Cancel() => _cancelledAt ??= _pausedAt ?? DateTimeOffset.UtcNow;
 
     /// <summary>Jumps to 5 seconds before the end.</summary>
     public void FinishSoon()

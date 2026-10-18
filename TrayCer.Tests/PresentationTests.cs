@@ -64,6 +64,77 @@ public sealed class PresentationTests
     }
 
     [TestMethod]
+    public void Indicator_ShowsTheHeatersWhileAPrintWarmsUp()
+    {
+        TemperatureReading[] warming =
+        [
+            new(TemperatureKind.Nozzle, "Nozzle", 120, 215),
+            new(TemperatureKind.Bed, "Bed", 60, 60),
+            new(TemperatureKind.Chamber, "Chamber", 31),
+        ];
+        PrinterStatus cold = Status("Voron", PrinterState.Preparing);
+        PrinterStatus preparing = cold with { Snapshot = cold.Snapshot! with { Temperatures = warming } };
+
+        TrayIndicator indicator = TrayIndicator.Compute([preparing], "Traycer");
+        Assert.AreEqual(TrayGlyph.Heating, indicator.Glyph);
+        Assert.AreEqual((95.0 + 35) / (190 + 35), indicator.Progress!.Value, 1e-9, "The nozzle's long climb counts for more than the bed's short one; the chamber has no target.");
+
+        Assert.AreEqual(TrayGlyph.Progress, TrayIndicator.Compute([preparing, Status("Ender", PrinterState.Printing, 0.3)], "Traycer").Glyph, "A print under way comes first.");
+        Assert.AreEqual(TrayGlyph.Progress, TrayIndicator.Compute([Status("Voron", PrinterState.Preparing)], "Traycer").Glyph, "No heater targets: nothing to fill.");
+    }
+
+    [TestMethod]
+    public void Indicator_KnowsAPrintIsWaitingEvenWhenOutranked()
+    {
+        PrinterStatus done = Status("P1S", PrinterState.Finished, 1, needsMarkComplete: true);
+        PrinterStatus failed = Status("K1", PrinterState.Error, attention: AttentionLevel.Error);
+
+        TrayIndicator outranked = TrayIndicator.Compute([done, failed], "Traycer");
+        Assert.AreEqual(TrayGlyph.Error, outranked.Glyph);
+        Assert.IsTrue(outranked.HasFinished, "The finished tile comes back after the error; the plate wasn't cleared.");
+        Assert.IsFalse(TrayIndicator.Compute([done with { NeedsMarkComplete = false }, failed], "Traycer").HasFinished);
+    }
+
+    [TestMethod]
+    public void HeatProgress_ClimbsFromRoomTemperature()
+    {
+        Assert.AreEqual(0.5, new TemperatureReading(TemperatureKind.Nozzle, "Nozzle", 120, 215).HeatProgress!.Value, 1e-9);
+        Assert.AreEqual(0, new TemperatureReading(TemperatureKind.Bed, "Bed", 20, 60).HeatProgress, "Colder than the room is no progress.");
+        Assert.AreEqual(1, new TemperatureReading(TemperatureKind.Bed, "Bed", 64, 60).HeatProgress, "Overshoot is done.");
+        Assert.IsNull(new TemperatureReading(TemperatureKind.Bed, "Bed", 30, 0).HeatProgress, "Off.");
+        Assert.IsNull(new PrinterSnapshot { State = PrinterState.Idle, Temperatures = [new(TemperatureKind.Bed, "Bed", 30)] }.HeatProgress);
+    }
+
+    [TestMethod]
+    public void Built_GrowsLayerByLayerAndEmptiesWhenMarkedComplete()
+    {
+        PrinterSnapshot printing = new() { State = PrinterState.Printing, Progress = 0.5, Layer = 45, TotalLayers = 200 };
+        Assert.AreEqual(0.225, BuildProgress.Built(printing, false), 1e-9, "Layers are heights; the percentage is usually time.");
+        Assert.AreEqual(0.5, BuildProgress.Built(printing with { Layer = null }, false), "No layers: the percentage will do.");
+        Assert.AreEqual(0, BuildProgress.Built(new PrinterSnapshot { State = PrinterState.Preparing }, false), "Nothing on the plate yet.");
+        Assert.AreEqual(0.225, BuildProgress.Built(printing with { State = PrinterState.Cancelled }, false), 1e-9, "A stopped print stays as far as it got.");
+        Assert.AreEqual(0.225, BuildProgress.Built(printing with { State = PrinterState.Error }, false), 1e-9, "So does a failed one.");
+
+        PrinterSnapshot finished = printing with { State = PrinterState.Finished, Progress = 1, Layer = 200 };
+        Assert.AreEqual(1, BuildProgress.Built(finished, needsMarkComplete: true), "Done, and still on the plate.");
+        Assert.AreEqual(0, BuildProgress.Built(finished, needsMarkComplete: false), "Marked complete: the plate is clear.");
+        Assert.AreEqual(1, BuildProgress.Built(new PrinterSnapshot { State = PrinterState.Idle }, needsMarkComplete: true), "Back to idle, not yet marked complete.");
+    }
+
+    [TestMethod]
+    public void ShowsHeat_WhileClimbingAndThroughTheWarmUp()
+    {
+        TemperatureReading atTarget = new(TemperatureKind.Nozzle, "Nozzle", 214, 215);
+        TemperatureReading climbing = new(TemperatureKind.Bed, "Bed", 48, 60);
+        TemperatureReading off = new(TemperatureKind.Bed, "Bed", 30, 0);
+
+        Assert.IsTrue(BuildProgress.ShowsHeat(atTarget, PrinterState.Preparing), "Before a print, every heater's bar stays up.");
+        Assert.IsFalse(BuildProgress.ShowsHeat(atTarget, PrinterState.Printing), "Mid-print at temperature: nothing to watch.");
+        Assert.IsTrue(BuildProgress.ShowsHeat(climbing, PrinterState.Printing), "A new target mid-print.");
+        Assert.IsFalse(BuildProgress.ShowsHeat(off, PrinterState.Preparing));
+    }
+
+    [TestMethod]
     public void Indicator_ShowsThePrintThatFinishesSoonest()
     {
         PrinterStatus slow = Status("Slow", PrinterState.Printing, 0.9, TimeSpan.FromHours(3));

@@ -18,7 +18,8 @@ namespace TrayCer.Views;
 
 /// <summary>
 /// Borderless, always-on-top popup shown against the tray icon, styled like the shell's own
-/// flyouts. Slides and fades in, light-dismisses when focus leaves. Dismissing only hides it, so
+/// flyouts. Slides and fades in (or just appears, with Windows' animation effects off),
+/// light-dismisses when focus leaves. Dismissing only hides it, so
 /// reopening soon after is instant; after <see cref="CloseDelay"/> hidden it closes for real and
 /// the next open builds a new window, so the idle app holds no XAML tree.
 /// </summary>
@@ -348,6 +349,15 @@ public sealed partial class TrayFlyoutWindow : WindowEx
 
     private void PlayShowAnimation()
     {
+        if (!MotionService.AnimationsEnabled)
+        {
+            // Animation effects are off: appear in place.
+            _animationTimer.Stop();
+            _isHiding = false;
+            ApplyFrame(0, 1);
+            return;
+        }
+
         _isHiding = false;
         _durationMs = ShowDurationMs;
         _fromOffset = ScaleForDpi(ShowSlideDistance);
@@ -362,6 +372,15 @@ public sealed partial class TrayFlyoutWindow : WindowEx
 
     private void PlayHideAnimation()
     {
+        if (!MotionService.AnimationsEnabled)
+        {
+            _animationTimer.Stop();
+            _isHiding = true;
+            ApplyFrame(0, 0);
+            this.Hide();
+            return;
+        }
+
         _isHiding = true;
         _durationMs = HideDurationMs;
         _fromOffset = _currentOffset;

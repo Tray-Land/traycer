@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TrayCer.Views.PlateWipe"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    AutomationProperties.AccessibilityView="Raw"
+    IsHitTestVisible="False">
+
+    <!--  Clipped away entirely until Play; the corners match the cards it covers  -->
+    <Rectangle
+        x:Name="Wash"
+        Fill="{ThemeResource SystemFillColorSuccessBrush}"
+        Opacity="0.22"
+        RadiusX="8"
+        RadiusY="8" />
+</UserControl>

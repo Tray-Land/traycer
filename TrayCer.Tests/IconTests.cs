@@ -90,6 +90,65 @@ public sealed class IconTests
     }
 
     [TestMethod]
+    [DataRow(16)]
+    [DataRow(24)]
+    public void Heating_DrawsAHotendOverAnAmberBar(int size)
+    {
+        uint[] pixels = TrayIconPainter.Heating(size, 0.5, TrayPalette.Dark);
+        int barRow = size - (TrayIconPainter.BarHeight(size) / 2) - 1;
+
+        Assert.AreEqual(TrayPalette.Dark.Caution, At(pixels, size, size / 4, barRow), "Warmed so far, in amber.");
+        Assert.AreEqual(TrayPalette.Dark.Track >> 24, (uint)Alpha(At(pixels, size, (size * 3) / 4, barRow)), "Still to warm: the track.");
+
+        int textHeight = TrayIconPainter.TextHeight(size);
+        Assert.AreEqual(TrayPalette.Dark.Foreground, At(pixels, size, size / 2, textHeight / 4), "The heater block.");
+        Assert.AreEqual(TrayPalette.Dark.Foreground, At(pixels, size, size / 2, (textHeight * 3) / 4), "The nozzle under it.");
+        Assert.AreEqual(0u, At(pixels, size, size / 4, (textHeight * 3) / 4), "The nozzle is narrower than the block.");
+    }
+
+    [TestMethod]
+    [DataRow(20)]
+    [DataRow(32)]
+    public void Marquee_WithHotend_LaysTextDownUnderTheNozzle(int size)
+    {
+        byte[] text = [.. Enumerable.Repeat((byte)255, size)];
+        uint plate = TrayPalette.Dark.Success;
+        uint ink = TrayPalette.Dark.OnSuccess;
+        int middle = size / 2;
+        int frames = TrayIconPainter.MarqueeFrames(size, 1, hotend: true);
+        Assert.IsLessThan(TrayIconPainter.MarqueeFrames(size, 1), frames, "The text starts under the nozzle, not at the edge.");
+
+        // On the first step the column appears under the nozzle; nothing to its right but plate.
+        uint[] first = TrayIconPainter.Marquee(size, text, 1, 1, plate, ink, hotend: true);
+        int entered = Enumerable.Range(0, size).Single(x => At(first, size, x, middle) == ink);
+        Assert.IsTrue(entered > size / 2 && entered < size - 2, "The text comes out from under the head, short of the right edge.");
+        Assert.IsTrue(Enumerable.Range(entered + 1, size - entered - 1).All(x => (At(first, size, x, middle) & 0xFFFFFF) == (plate & 0xFFFFFF)));
+        Assert.AreEqual(ink, At(first, size, entered, 1), "The head's block sits at the top, above where the text appears.");
+
+        uint[] last = TrayIconPainter.Marquee(size, text, 1, frames - 1, plate, ink, hotend: true);
+        Assert.AreEqual(ink, At(last, size, 0, middle), "And it still leaves at the left.");
+        Assert.IsFalse(TrayIconPainter.HotendFits(16), "Too small to read at 100% scale.");
+    }
+
+    [TestMethod]
+    public void SlideOut_DropsThePlateAndFadesIt()
+    {
+        const int size = 16;
+        uint[] tile = TrayIconPainter.Badge(size, BadgeSymbol.Check, TrayPalette.Dark.Success, TrayPalette.Dark.OnSuccess);
+
+        CollectionAssert.AreEqual(tile, TrayIconPainter.SlideOut(tile, size, 0));
+
+        uint[] half = TrayIconPainter.SlideOut(tile, size, 0.5);
+        int shift = size / 4; // Eases in: halfway through time is a quarter of the way down.
+        Assert.IsTrue(half.Take(size * shift).All(p => p == 0), "The top is empty once it starts to drop.");
+        uint moved = At(half, size, size / 2, (size / 2) + shift);
+        Assert.AreEqual(At(tile, size, size / 2, size / 2) & 0xFFFFFF, moved & 0xFFFFFF, "Same color, lower down.");
+        Assert.AreEqual(128u, (uint)Alpha(moved), 1, "Half faded.");
+
+        Assert.IsTrue(TrayIconPainter.SlideOut(tile, size, 1).All(p => p == 0), "Gone.");
+    }
+
+    [TestMethod]
     public void Paused_DrawsTwoBarsInCaution()
     {
         const int size = 20;
