@@ -28,8 +28,9 @@ public enum BadgeSymbol
 }
 
 /// <summary>
-/// Draws the dynamic tray icons as ARGB pixels: a percentage over a progress bar, pause bars,
-/// round badges, and frames of text scrolling across a plate. Shapes are signed-distance fields
+/// Draws the dynamic tray icons as ARGB pixels: a percentage over a progress bar, a hotend over a
+/// warming bar, pause bars, round badges, and frames of text scrolling across a plate under a
+/// print head. Shapes are signed-distance fields
 /// sampled at pixel centers, which anti-aliases them without a graphics library. Text arrives as
 /// coverage rendered by the app in the system font; a built-in pixel font stands in for digits
 /// when that fails (and in tests).
@@ -53,6 +54,16 @@ public static class TrayIconPainter
         }
 
         DrawBar(pixels, size, progress, palette.Foreground, palette.Track);
+        return pixels;
+    }
+
+    /// <summary>A hotend above a bar that fills in amber as the heaters reach their targets.</summary>
+    public static uint[] Heating(int size, double? heat, TrayPalette palette)
+    {
+        uint[] pixels = new uint[size * size];
+        int textHeight = TextHeight(size);
+        Fill(pixels, size, palette.Foreground, (x, y) => Hotend(x, y, size / 2.0, textHeight * 0.06, textHeight * 0.9, size * 0.56));
+        DrawBar(pixels, size, heat, palette.Caution, palette.Track);
         return pixels;
     }
 
@@ -103,20 +114,33 @@ public static class TrayIconPainter
     public static int MarqueeLineHeight(int size) => Math.Max(5, (int)Math.Round(size * 0.8));
 
     /// <summary>
-    /// Scroll positions in one pass of a marquee <paramref name="textWidth"/> wide: the text enters
-    /// at the right edge and leaves at the left, so a pass is its width plus one icon of bare plate.
+    /// Whether a marquee this size has room for a print head over its text. The head fits in the
+    /// strip above the capitals, which is too thin to read below 20 pixels (125% scale).
     /// </summary>
-    public static int MarqueeFrames(int size, int textWidth) => textWidth + size;
+    public static bool HotendFits(int size) => size >= 20;
 
-    /// <summary>A rounded square plate with the text scrolled to <paramref name="position"/> (0 to <see cref="MarqueeFrames"/>-1), clipped to the plate.</summary>
+    /// <summary>
+    /// Scroll positions in one pass of a marquee <paramref name="textWidth"/> wide. The text enters
+    /// at the right edge, or under the print head, and leaves at the left, so a pass is its width
+    /// plus the width it travels across.
+    /// </summary>
+    public static int MarqueeFrames(int size, int textWidth, bool hotend = false) => textWidth + Entry(size, hotend);
+
+    /// <summary>
+    /// A rounded square plate with the text scrolled to <paramref name="position"/> (0 to
+    /// <see cref="MarqueeFrames"/>-1), clipped to the plate. With <paramref name="hotend"/>, a print
+    /// head sits over the right of the plate and the text comes out from under it, like a belt
+    /// printer laying it down: nothing shows to the right of the nozzle.
+    /// </summary>
     /// <param name="text">Coverage (0-255) for a strip <paramref name="textWidth"/> wide and <paramref name="size"/> tall.</param>
-    public static uint[] Marquee(int size, ReadOnlySpan<byte> text, int textWidth, int position, uint background, uint foreground)
+    public static uint[] Marquee(int size, ReadOnlySpan<byte> text, int textWidth, int position, uint background, uint foreground, bool hotend = false)
     {
         ArgumentOutOfRangeException.ThrowIfNotEqual(text.Length, textWidth * size, nameof(text));
 
         uint[] pixels = new uint[size * size];
         double radius = size * 0.2;
-        int offset = position - size; // Column of the strip under the icon's left edge.
+        int entry = Entry(size, hotend);
+        int offset = position - entry; // Column of the strip under the icon's left edge.
         for (int y = 0; y < size; y++)
         {
             for (int x = 0; x < size; x++)
@@ -128,13 +152,49 @@ public static class TrayIconPainter
                 }
 
                 int column = offset + x;
-                double ink = column >= 0 && column < textWidth ? text[(y * textWidth) + column] / 255.0 : 0;
+                double ink = x < entry && column >= 0 && column < textWidth ? text[(y * textWidth) + column] / 255.0 : 0;
+                if (hotend)
+                {
+                    ink = Math.Max(ink, Math.Clamp(0.5 - MarqueeHotend(x + 0.5, y + 0.5, size), 0, 1));
+                }
+
                 pixels[(y * size) + x] = Over(0, Over(background, foreground, ink), plate);
             }
         }
 
         return pixels;
     }
+
+    /// <summary>
+    /// A frame of <paramref name="pixels"/> sliding down out of the icon and fading, from
+    /// <paramref name="t"/> = 0 (in place) to 1 (gone): the plate pulled out of the printer.
+    /// </summary>
+    public static uint[] SlideOut(ReadOnlySpan<uint> pixels, int size, double t)
+    {
+        ArgumentOutOfRangeException.ThrowIfNotEqual(pixels.Length, size * size, nameof(pixels));
+
+        t = Math.Clamp(t, 0, 1);
+        int shift = (int)Math.Round(size * t * t); // Eases in: it starts slowly, then drops away.
+        uint[] frame = new uint[size * size];
+        for (int y = shift; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                frame[(y * size) + x] = Over(0, pixels[((y - shift) * size) + x], 1 - t);
+            }
+        }
+
+        return frame;
+    }
+
+    /// <summary>The first column the marquee text can't reach: the icon's right edge, or just past the nozzle.</summary>
+    private static int Entry(int size, bool hotend) => hotend ? (int)Math.Floor(NozzleX(size)) + 1 : size;
+
+    private static double NozzleX(int size) => size * 0.72;
+
+    /// <summary>The marquee's print head, in the strip above the capitals, its tip just touching them.</summary>
+    private static double MarqueeHotend(double px, double py, int size) =>
+        Hotend(px, py, NozzleX(size), size * 0.02, size * 0.25, size * 0.36);
 
     private static int Gap(int size) => Math.Max(1, size / 16);
 
@@ -177,6 +237,39 @@ public static class TrayIconPainter
         double qy = Math.Abs(py - cy) - (((y1 - y0) / 2) - radius);
         double outside = Math.Sqrt((Math.Max(qx, 0) * Math.Max(qx, 0)) + (Math.Max(qy, 0) * Math.Max(qy, 0)));
         return outside + Math.Min(Math.Max(qx, qy), 0) - radius;
+    }
+
+    /// <summary>
+    /// A hotend seen from the front, centered on <paramref name="cx"/>: a heater block
+    /// <paramref name="width"/> wide over a nozzle that narrows to its tip at <paramref name="tipY"/>.
+    /// </summary>
+    private static double Hotend(double px, double py, double cx, double top, double tipY, double width)
+    {
+        double blockBottom = top + ((tipY - top) * 0.55);
+        double radius = Math.Min(width, tipY - top) * 0.1;
+        double block = RoundedRect(px, py, cx - (width / 2), top, cx + (width / 2), blockBottom, radius);
+
+        // The nozzle starts half a pixel inside the block, so no seam shows between them.
+        double nozzle = Trapezoid(px, py, cx, blockBottom - 0.5, tipY, width * 0.32, width * 0.1);
+        return Math.Min(block, nozzle);
+    }
+
+    /// <summary>A trapezoid centered on <paramref name="cx"/>, <paramref name="topHalf"/> wide either side at the top and <paramref name="bottomHalf"/> at the bottom.</summary>
+    private static double Trapezoid(double px, double py, double cx, double top, double bottom, double topHalf, double bottomHalf)
+    {
+        // After Inigo Quilez's 2D distance functions, with y running down.
+        double he = (bottom - top) / 2;
+        double x = Math.Abs(px - cx);
+        double y = py - ((top + bottom) / 2);
+        double k2x = bottomHalf - topHalf;
+        double k2y = 2 * he;
+        double cax = x - Math.Min(x, y < 0 ? topHalf : bottomHalf);
+        double cay = Math.Abs(y) - he;
+        double t = Math.Clamp((((bottomHalf - x) * k2x) + ((he - y) * k2y)) / ((k2x * k2x) + (k2y * k2y)), 0, 1);
+        double cbx = x - bottomHalf + (k2x * t);
+        double cby = y - he + (k2y * t);
+        double sign = cbx < 0 && cay < 0 ? -1 : 1;
+        return sign * Math.Sqrt(Math.Min((cax * cax) + (cay * cay), (cbx * cbx) + (cby * cby)));
     }
 
     private static double Circle(double px, double py, double cx, double cy, double radius) =>

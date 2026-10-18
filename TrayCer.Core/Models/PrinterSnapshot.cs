@@ -32,8 +32,22 @@ public enum TemperatureKind
 
 public sealed record TemperatureReading(TemperatureKind Kind, string Label, double Current, double? Target = null)
 {
+    /// <summary>Where a heater starts its climb from: a cold printer sits at room temperature.</summary>
+    public const double Room = 25;
+
     /// <summary>A target of 0 means the heater is off; only a positive target is worth showing.</summary>
     public bool IsHeating => Target is > 0;
+
+    /// <summary>Still a few degrees short of its target.</summary>
+    public bool IsWarmingUp => Target is > 0 and double target && target - Current >= 3;
+
+    /// <summary>How far the heater has climbed from room temperature to its target, 0 to 1; null when it's off.</summary>
+    public double? HeatProgress => Target is > 0 ? Climbed / Climb : null;
+
+    /// <summary>Degrees from room temperature to the target.</summary>
+    internal double Climb => Math.Max(1, (Target ?? Room) - Room);
+
+    internal double Climbed => Math.Clamp(Current - Room, 0, Climb);
 }
 
 /// <summary>A protocol-specific fact the generic layout has no slot for: speed, filament, Wi-Fi signal.</summary>
@@ -75,6 +89,20 @@ public sealed record PrinterSnapshot
     public IReadOnlyList<TemperatureReading> Temperatures { get; init; } = [];
 
     public IReadOnlyList<DetailItem> Details { get; init; } = [];
+
+    /// <summary>
+    /// How far the heaters with a target have climbed together, 0 to 1, each weighted by the degrees
+    /// it has to climb, so a quick nozzle and a slow bed make one steady bar. Null when every heater
+    /// is off.
+    /// </summary>
+    public double? HeatProgress
+    {
+        get
+        {
+            List<TemperatureReading> heating = [.. Temperatures.Where(t => t.IsHeating)];
+            return heating.Count == 0 ? null : heating.Sum(t => t.Climbed) / heating.Sum(t => t.Climb);
+        }
+    }
 
     /// <summary>True while a job occupies the printer, so it's worth watching closely.</summary>
     public bool IsActive => State is PrinterState.Preparing or PrinterState.Printing or PrinterState.Paused
