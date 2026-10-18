@@ -1,6 +1,8 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using TrayCer.Core.Monitoring;
+using TrayCer.Core.Presentation;
 using TrayCer.Services;
 using TrayCer.Views;
 using WinUIEx;
@@ -8,8 +10,9 @@ using WinUIEx;
 namespace TrayCer;
 
 /// <summary>
-/// Tray-only application: no window at launch, just a notification-area icon that toggles the
-/// flyout. Windows exist only while they're in use; the idle app is an icon and little else.
+/// Tray-only application: no window at launch, just a notification-area icon that shows print
+/// progress and toggles the flyout. Windows exist only while they're in use; the idle app is an
+/// icon, the printer monitors, and little else.
 /// </summary>
 public partial class App : Application
 {
@@ -17,18 +20,18 @@ public partial class App : Application
 
     private const string MutexName = "Local\\TrayCer_SingleInstance";
     private const string ShowEventName = "Local\\TrayCer_ShowFlyout";
-    private const int MaxTooltipLength = 127; // NOTIFYICONDATA.szTip limit
 
     // Startup leaves JIT and first-request state behind that the idle app never touches again.
     private static readonly TimeSpan StartupTrimDelay = TimeSpan.FromSeconds(30);
 
+    private readonly TrayIconRenderer _trayRenderer = new();
     private Mutex? _singleInstanceMutex;
     private EventWaitHandle? _showEvent;
     private RegisteredWaitHandle? _showWait;
     private TrayIcon? _trayIcon;
     private TrayFlyoutWindow? _flyout;
-    private SettingsWindow? _settings;
     private DispatcherQueue? _dispatcher;
+    private PrinterHub? _hub;
     private bool _isExiting;
 
     public App()
@@ -42,6 +45,9 @@ public partial class App : Application
     }
 
     public static new App Current => (App)Application.Current;
+
+    /// <summary>The printer monitors; created at launch and alive until exit.</summary>
+    internal PrinterHub Hub => _hub ?? throw new InvalidOperationException("The app hasn't launched.");
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
@@ -72,7 +78,16 @@ public partial class App : Application
         _showWait = ThreadPool.RegisterWaitForSingleObject(_showEvent,
             (_, _) => _dispatcher.TryEnqueue(ShowFlyout), null, Timeout.Infinite, executeOnlyOnce: false);
 
+        NotificationService.Opened += (_, _) => _dispatcher.TryEnqueue(ShowFlyout);
+        NotificationService.Register();
+
         InitializeTrayIcon();
+
+        _hub = new PrinterHub(_dispatcher);
+        _hub.Changed += (_, _) => UpdateTrayIcon();
+        _hub.PrintEventRaised += Hub_PrintEventRaised;
+        _hub.Start();
+        UpdateTrayIcon();
 
         // First run: show where the app lives instead of launching into silence.
         if (!SettingsService.HasLaunchedBefore)
@@ -86,41 +101,35 @@ public partial class App : Application
         }
     }
 
-    /// <summary>Sets the tray tooltip under the app name, e.g. "3 new" or null for just the name.</summary>
-    public void SetTrayStatus(string? status)
-    {
-        if (_trayIcon is null)
-        {
-            return;
-        }
-
-        string tooltip = string.IsNullOrWhiteSpace(status) ? DisplayName : $"{DisplayName}\n{status}";
-        _trayIcon.Tooltip = tooltip.Length > MaxTooltipLength ? tooltip[..MaxTooltipLength] : tooltip;
-    }
-
     public void ShowFlyout()
     {
         TrayFlyoutWindow flyout = EnsureFlyout();
         flyout.HidePopup();
+        flyout.ReturnHomeIfStale();
         flyout.ShowPopup();
     }
 
-    public void ShowSettings()
-    {
-        _flyout?.HidePopup();
-        if (_settings is null)
-        {
-            _settings = new SettingsWindow();
-            _settings.Closed += (_, _) =>
-            {
-                _settings = null;
-                ReleaseIdleResourcesIfNoWindows();
-            };
-        }
+    public void ShowSettings() => ShowPage(f => f.ShowSettings());
 
-        _settings.Activate();
-        _settings.BringToFront();
+    private void ShowPage(Action<TrayFlyoutWindow> navigate)
+    {
+        TrayFlyoutWindow flyout = EnsureFlyout();
+        navigate(flyout);
+        if (!flyout.IsPopupVisible)
+        {
+            flyout.ShowPopup();
+        }
     }
+
+    /// <summary>The flyout is on screen: poll every printer closely, and its news has been seen.</summary>
+    internal void OnFlyoutShown()
+    {
+        Hub.Foreground = true;
+        Hub.AcknowledgeAll();
+        NotificationService.ClearAll();
+    }
+
+    internal void OnFlyoutHidden() => Hub.Foreground = false;
 
     private void InitializeTrayIcon()
     {
@@ -129,24 +138,76 @@ public partial class App : Application
         _trayIcon.ContextMenu += TrayIcon_ContextMenu;
         _trayIcon.IsVisible = true;
         WindowPlacementService.SetTrayIcon(_trayIcon);
-        SystemThemeService.Changed += (_, _) => _dispatcher?.TryEnqueue(() => _trayIcon?.SetIcon(TrayIconPath));
+        SystemThemeService.Changed += (_, _) => _dispatcher?.TryEnqueue(() =>
+        {
+            _trayRenderer.Invalidate();
+            UpdateTrayIcon();
+        });
     }
 
     // A white glyph disappears on a light taskbar, which follows the Windows theme, not the app theme.
     private static string TrayIconPath => Path.Combine(
         AppContext.BaseDirectory, "Assets", SystemThemeService.IsLight ? "AppIcon-dark.ico" : "AppIcon.ico");
 
+    /// <summary>Redraws the tray icon and tooltip from every printer's latest status.</summary>
+    private void UpdateTrayIcon()
+    {
+        if (_trayIcon is null || _hub is null)
+        {
+            return;
+        }
+
+        TrayIndicator indicator = TrayIndicator.Compute(_hub.Statuses, DisplayName);
+        _trayRenderer.Show(_trayIcon, indicator, SystemThemeService.IsLight, TrayIconPath);
+        _trayIcon.Tooltip = indicator.Tooltip;
+    }
+
+    private void Hub_PrintEventRaised(object? sender, (PrinterStatus Status, PrintEvent Event) e)
+    {
+        bool wanted = e.Event.Kind switch
+        {
+            PrintEventKind.Finished => SettingsService.NotifyWhenFinished,
+            PrintEventKind.Failed or PrintEventKind.Error or PrintEventKind.Paused or PrintEventKind.NeedsAttention => SettingsService.NotifyAboutProblems,
+            _ => false,
+        };
+
+        // No toast for news the user is already looking at.
+        if (wanted && _flyout?.IsPopupVisible != true && StatusText.Notification(e.Status.Config.Name, e.Event) is { } toast)
+        {
+            NotificationService.Show(e.Status.Config.Id, toast.Title, toast.Body);
+        }
+
+        if (_flyout?.IsPopupVisible == true)
+        {
+            Hub.AcknowledgeAll();
+        }
+    }
+
     private void TrayIcon_ContextMenu(TrayIcon sender, TrayIconEventArgs args)
     {
         MenuFlyout menu = new();
         MenuFlyoutItem open = new() { Text = $"Open {DisplayName}", Icon = new FontIcon { Glyph = "" } };
         open.Click += (_, _) => ShowFlyout();
+        menu.Items.Add(open);
+
+        if (Hub.Statuses.Count > 0)
+        {
+            MenuFlyoutItem refresh = new() { Text = "Refresh printers", Icon = new FontIcon { Glyph = "" } };
+            refresh.Click += (_, _) => Hub.RefreshAll();
+            menu.Items.Add(refresh);
+        }
+
+        MenuFlyoutItem find = new() { Text = "Find printers", Icon = new FontIcon { Glyph = "" } };
+        find.Click += (_, _) => ShowPage(f => f.ShowDiscover());
+        MenuFlyoutItem add = new() { Text = "Add a printer", Icon = new FontIcon { Glyph = "" } };
+        add.Click += (_, _) => ShowPage(f => f.ShowAddPrinter());
         MenuFlyoutItem settings = new() { Text = "Settings", Icon = new FontIcon { Glyph = "" } };
         settings.Click += (_, _) => ShowSettings();
         MenuFlyoutItem exit = new() { Text = "Exit", Icon = new FontIcon { Glyph = "" } };
         exit.Click += (_, _) => ExitApp();
 
-        menu.Items.Add(open);
+        menu.Items.Add(find);
+        menu.Items.Add(add);
         menu.Items.Add(settings);
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(exit);
@@ -159,29 +220,29 @@ public partial class App : Application
         {
             // The flyout closes itself after staying hidden for a while; the next open builds a new one.
             _flyout = new TrayFlyoutWindow();
-            _flyout.Closed += (_, _) =>
+            _flyout.Closed += (sender, _) =>
             {
                 _flyout = null;
-                ReleaseIdleResourcesIfNoWindows();
+                _hub?.ReleaseThumbnails();
+                ReleaseIdleResourcesIfNoWindows(sender);
             };
         }
 
         return _flyout;
     }
 
-    private void ReleaseIdleResourcesIfNoWindows()
+    private void ReleaseIdleResourcesIfNoWindows(object closedWindow)
     {
-        if (_flyout is null && _settings is null && !_isExiting)
+        if (_flyout is null && !_isExiting)
         {
-            MemoryService.ReleaseIdle();
+            MemoryService.ReleaseIdle(closedWindow: closedWindow);
         }
     }
 
-    private void ExitApp()
+    private async void ExitApp()
     {
         _isExiting = true;
         _flyout?.CloseWindow();
-        _settings?.Close();
 
         if (_trayIcon is not null)
         {
@@ -190,10 +251,19 @@ public partial class App : Application
             _trayIcon = null;
         }
 
+        _trayRenderer.Release();
+        NotificationService.Unregister();
         _showWait?.Unregister(null);
         _showEvent?.Dispose();
         _singleInstanceMutex?.ReleaseMutex();
         _singleInstanceMutex?.Dispose();
+
+        if (_hub is not null)
+        {
+            // Close MQTT and WebSocket sessions politely, but don't hang the exit on a dead printer.
+            await Task.WhenAny(_hub.StopAsync(), Task.Delay(TimeSpan.FromSeconds(2)));
+        }
+
         Exit();
     }
 

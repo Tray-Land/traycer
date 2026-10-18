@@ -6,10 +6,24 @@
     xmlns:ex="using:WinUIEx"
     Title="Traycer">
 
-    <Grid x:Name="PopupRoot" KeyboardAcceleratorPlacementMode="Hidden">
+    <Grid
+        x:Name="PopupRoot"
+        KeyboardAcceleratorPlacementMode="Hidden"
+        PointerPressed="PopupRoot_PointerPressed">
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="Escape" Invoked="Escape_Invoked" />
+            <KeyboardAccelerator
+                Key="Left"
+                Invoked="GoBack_Invoked"
+                Modifiers="Menu" />
         </Grid.KeyboardAccelerators>
-        <ContentPresenter x:Name="PageHost" />
+        <!--  Pages swap in place with a drill-in slide; FlyoutPage stays alive underneath.  -->
+        <ContentPresenter x:Name="PageHost">
+            <ContentPresenter.ContentTransitions>
+                <TransitionCollection>
+                    <ContentThemeTransition HorizontalOffset="24" />
+                </TransitionCollection>
+            </ContentPresenter.ContentTransitions>
+        </ContentPresenter>
     </Grid>
 </ex:WindowEx>

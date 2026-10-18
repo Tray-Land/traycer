@@ -1,0 +1,42 @@
+{
+  "print": {
+    "command": "push_status",
+    "msg": 0,
+    "sequence_id": "2021",
+    "gcode_state": "RUNNING",
+    "mc_print_stage": "2",
+    "stg_cur": 0,
+    "mc_percent": 63,
+    "mc_remaining_time": 47,
+    "layer_num": 112,
+    "total_layer_num": 180,
+    "subtask_name": "Phone stand",
+    "gcode_file": "/data/Metadata/plate_1.gcode",
+    "gcode_start_time": "1729400000",
+    "print_error": 0,
+    "nozzle_temper": 219.8,
+    "nozzle_target_temper": 220,
+    "bed_temper": 55.1,
+    "bed_target_temper": 55,
+    "chamber_temper": 31,
+    "spd_lvl": 2,
+    "nozzle_diameter": "0.4",
+    "nozzle_type": "hardened_steel",
+    "wifi_signal": "-48dBm",
+    "hms": [],
+    "ams": {
+      "tray_now": "5",
+      "ams": [
+        { "id": "0", "humidity": "4", "temp": "26.1", "tray": [
+          { "id": "0", "tray_type": "PLA", "tray_sub_brands": "PLA Basic", "tray_color": "FFFFFFFF" },
+          { "id": "1", "tray_type": "PETG", "tray_sub_brands": "PETG HF", "tray_color": "000000FF" }
+        ] },
+        { "id": "1", "humidity": "3", "temp": "25.9", "tray": [
+          { "id": "0", "tray_type": "PLA", "tray_sub_brands": "PLA Matte", "tray_color": "FF6A13FF" },
+          { "id": "1", "tray_type": "PLA", "tray_sub_brands": "PLA Silk", "tray_color": "2850E0FF" }
+        ] }
+      ]
+    },
+    "vt_tray": { "id": "254", "tray_type": "TPU", "tray_color": "FF0000FF" }
+  }
+}

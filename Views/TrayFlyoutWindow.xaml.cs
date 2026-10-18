@@ -24,8 +24,8 @@ namespace TrayCer.Views;
 /// </summary>
 public sealed partial class TrayFlyoutWindow : WindowEx
 {
-    private const int PopupWidth = 360;
-    private const int PopupHeight = 480;
+    private const int PopupWidth = 380;
+    private const int PopupHeight = 560;
 
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     private const int WS_EX_LAYERED = 0x00080000;
@@ -45,8 +45,12 @@ public sealed partial class TrayFlyoutWindow : WindowEx
 
     private static readonly TimeSpan CloseDelay = TimeSpan.FromMinutes(1);
 
+    /// <summary>A drilled-in page survives a quick dismiss; after this long hidden, a tray click opens home.</summary>
+    private static readonly TimeSpan KeepPageFor = TimeSpan.FromSeconds(30);
+
     private readonly HWND _hwnd;
-    private readonly FlyoutPage _page = new();
+    private readonly FlyoutPage _page;
+    private readonly Stack<FrameworkElement> _backStack = new();
     private readonly ShellBackdrop _backdrop = new();
     private readonly UISettings _uiSettings = new();
     private readonly DispatcherQueueTimer _hideTimer;
@@ -78,6 +82,7 @@ public sealed partial class TrayFlyoutWindow : WindowEx
     {
         InitializeComponent();
         _hwnd = (HWND)WindowNative.GetWindowHandle(this);
+        _page = new FlyoutPage(this);
         PageHost.Content = _page;
 
         SystemBackdrop = _backdrop;
@@ -93,18 +98,22 @@ public sealed partial class TrayFlyoutWindow : WindowEx
         _hideTimer = DispatcherQueue.CreateTimer();
         _hideTimer.Interval = TimeSpan.FromMilliseconds(150);
         _hideTimer.IsRepeating = false;
-        _hideTimer.Tick += (_, _) => HideIfFocusLeftWindow();
+        _hideTimer.Tick += HideTimer_Tick;
 
         _closeTimer = DispatcherQueue.CreateTimer();
         _closeTimer.Interval = CloseDelay;
         _closeTimer.IsRepeating = false;
-        _closeTimer.Tick += (_, _) => CloseIfStillHidden();
+        _closeTimer.Tick += CloseTimer_Tick;
 
         _animationTimer = DispatcherQueue.CreateTimer();
         _animationTimer.Interval = TimeSpan.FromMilliseconds(15);
         _animationTimer.IsRepeating = true;
         _animationTimer.Tick += AnimationTimer_Tick;
     }
+
+    public bool IsPopupVisible => _isPopupVisible;
+
+    private FrameworkElement CurrentView => (FrameworkElement)PageHost.Content;
 
     /// <summary>Shows the popup, or hides it if already visible (tray-icon click behavior).</summary>
     public void Toggle()
@@ -120,7 +129,104 @@ public sealed partial class TrayFlyoutWindow : WindowEx
             return;
         }
 
+        ReturnHomeIfStale();
         ShowPopup();
+    }
+
+    /// <summary>After a while hidden, the next open starts from the printer list again.</summary>
+    public void ReturnHomeIfStale()
+    {
+        if (!_isPopupVisible && DateTime.UtcNow - _lastDismissedAtUtc > KeepPageFor)
+        {
+            GoHome();
+        }
+    }
+
+    /// <summary>Drills into a page, keeping the current one to go back to.</summary>
+    public void Navigate(FrameworkElement view)
+    {
+        FrameworkElement current = CurrentView;
+        (current as IFlyoutView)?.OnHidden();
+        _backStack.Push(current);
+        PageHost.Content = view;
+        if (_isPopupVisible)
+        {
+            (view as IFlyoutView)?.OnShown();
+        }
+    }
+
+    /// <summary>Goes back one page; false when already on the printer list.</summary>
+    public bool GoBack()
+    {
+        if (_backStack.Count == 0)
+        {
+            return false;
+        }
+
+        FrameworkElement leaving = CurrentView;
+        (leaving as IFlyoutView)?.OnHidden();
+        (leaving as IDisposable)?.Dispose();
+        PageHost.Content = _backStack.Pop();
+        if (_isPopupVisible)
+        {
+            (CurrentView as IFlyoutView)?.OnShown();
+        }
+
+        return true;
+    }
+
+    public void GoHome()
+    {
+        if (PopToHome() && _isPopupVisible)
+        {
+            _page.OnShown();
+        }
+    }
+
+    public void ShowSettings() => ShowPage<SettingsView>(() => new SettingsView(this));
+
+    public void ShowDiscover() => ShowPage<DiscoverView>(() => new DiscoverView(this));
+
+    public void ShowAddPrinter() => ShowPage<EditPrinterView>(() => new EditPrinterView(this));
+
+    public void ShowPrinter(string printerId)
+    {
+        PopToHome();
+        Navigate(new PrinterDetailView(this, printerId));
+    }
+
+    /// <summary>Opens <typeparamref name="T"/> straight from the printer list, unless it's already showing.</summary>
+    private void ShowPage<T>(Func<T> create)
+        where T : FrameworkElement
+    {
+        if (CurrentView is not T)
+        {
+            PopToHome();
+            Navigate(create());
+        }
+    }
+
+    /// <summary>
+    /// Drops every page above the printer list without showing the ones in between. False when
+    /// already home. The caller decides whether to show.
+    /// </summary>
+    private bool PopToHome()
+    {
+        if (_backStack.Count == 0)
+        {
+            return false;
+        }
+
+        FrameworkElement leaving = CurrentView;
+        (leaving as IFlyoutView)?.OnHidden();
+        (leaving as IDisposable)?.Dispose();
+        while (_backStack.Count > 1)
+        {
+            (_backStack.Pop() as IDisposable)?.Dispose(); // Already hidden when it was navigated away from.
+        }
+
+        PageHost.Content = _backStack.Pop();
+        return true;
     }
 
     public void ShowPopup()
@@ -143,7 +249,8 @@ public sealed partial class TrayFlyoutWindow : WindowEx
         Activate();
         PInvoke.SetForegroundWindow(_hwnd);
 
-        _page.OnShown();
+        App.Current.OnFlyoutShown();
+        (CurrentView as IFlyoutView)?.OnShown();
     }
 
     public void HidePopup()
@@ -158,7 +265,8 @@ public sealed partial class TrayFlyoutWindow : WindowEx
 
         _isPopupVisible = false;
         _lastDismissedAtUtc = DateTime.UtcNow;
-        _page.OnHidden();
+        (CurrentView as IFlyoutView)?.OnHidden();
+        App.Current.OnFlyoutHidden();
         PlayHideAnimation();
 
         _closeTimer.Stop();
@@ -180,12 +288,30 @@ public sealed partial class TrayFlyoutWindow : WindowEx
         _hideTimer.Stop();
         _closeTimer.Stop();
         _animationTimer.Stop();
+        GoHome();
         _page.OnHidden();
         _page.Dispose();
 
         _uiSettings.ColorValuesChanged -= OnColorValuesChanged;
         Activated -= OnWindowActivated;
         AppWindow.Closing -= OnAppWindowClosing;
+
+        // A native timer holds its Tick delegate, the delegate holds this window, and the window
+        // holds the timer: a cycle through native code that the GC can't see through.
+        _hideTimer.Tick -= HideTimer_Tick;
+        _closeTimer.Tick -= CloseTimer_Tick;
+        _animationTimer.Tick -= AnimationTimer_Tick;
+
+        // Disconnect the backdrop now so its acrylic controller (which holds this window as its
+        // target) is disposed, and drop the page tree, before the window goes.
+        SystemBackdrop = null;
+        PageHost.Content = null;
+
+        // WinUIEx's WindowManager subscribes to AppWindow events and its own DispatcherQueueTimer
+        // and unsubscribes only when disposed, which WindowEx never does. Without this, every
+        // closed flyout stays alive with its whole XAML tree, about 15 MB each, for the life of
+        // the process: a plain Window is collected after Close, a WindowEx isn't.
+        WindowManager.Get(this).Dispose();
 
         _allowClose = true;
         Close();
@@ -246,6 +372,10 @@ public sealed partial class TrayFlyoutWindow : WindowEx
         _animationClock.Restart();
         _animationTimer.Start();
     }
+
+    private void HideTimer_Tick(DispatcherQueueTimer sender, object args) => HideIfFocusLeftWindow();
+
+    private void CloseTimer_Tick(DispatcherQueueTimer sender, object args) => CloseIfStillHidden();
 
     private void AnimationTimer_Tick(DispatcherQueueTimer sender, object args)
     {
@@ -363,6 +493,22 @@ public sealed partial class TrayFlyoutWindow : WindowEx
     private void Escape_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
-        HidePopup();
+        if (!GoBack())
+        {
+            HidePopup();
+        }
+    }
+
+    private void GoBack_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = GoBack();
+    }
+
+    private void PopupRoot_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.GetCurrentPoint(PopupRoot).Properties.IsXButton1Pressed)
+        {
+            e.Handled = GoBack();
+        }
     }
 }

@@ -19,6 +19,7 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock
                 x:Name="TitleText"
@@ -26,8 +27,29 @@
                 Style="{StaticResource SubtitleTextBlockStyle}"
                 Text="Traycer" />
             <Button
-                x:Name="RefreshButton"
                 Grid.Column="1"
+                AutomationProperties.Name="Add a printer"
+                Style="{StaticResource FlyoutIconButtonStyle}"
+                ToolTipService.ToolTip="Add a printer">
+                <FontIcon FontSize="14" Glyph="&#xE710;" />
+                <Button.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                        <MenuFlyoutItem Click="FindPrinters_Click" Text="Find printers on my network">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE721;" />
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Click="AddByAddress_Click" Text="Add by address">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE774;" />
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+            <Button
+                x:Name="RefreshButton"
+                Grid.Column="2"
                 AutomationProperties.Name="Refresh"
                 Click="RefreshButton_Click"
                 Style="{StaticResource FlyoutIconButtonStyle}"
@@ -35,7 +57,7 @@
                 <FontIcon FontSize="14" Glyph="&#xE72C;" />
             </Button>
             <Button
-                Grid.Column="2"
+                Grid.Column="3"
                 AutomationProperties.Name="Settings"
                 Click="SettingsButton_Click"
                 Style="{StaticResource FlyoutIconButtonStyle}"
@@ -44,7 +66,7 @@
             </Button>
         </Grid>
 
-        <!--  Errors keep the last good content visible underneath  -->
+        <!--  Network trouble; the cards keep their last readings underneath  -->
         <InfoBar
             x:Name="StatusBar"
             Grid.Row="1"
@@ -52,26 +74,50 @@
             IsOpen="False"
             Severity="Warning" />
 
-        <!--  Content: replace with the app's own view  -->
-        <Border
+        <!--  Printers  -->
+        <ScrollViewer
+            x:Name="ListScroller"
             Grid.Row="2"
-            Padding="16"
-            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            BorderThickness="1"
-            CornerRadius="8">
-            <StackPanel VerticalAlignment="Center" Spacing="4">
-                <TextBlock
-                    x:Name="ValueText"
-                    HorizontalAlignment="Center"
-                    Style="{StaticResource TitleLargeTextBlockStyle}"
-                    Text="--" />
-                <TextBlock
-                    HorizontalAlignment="Center"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="Replace this card with the app's content." />
-            </StackPanel>
-        </Border>
+            Margin="0,0,-4,0"
+            Padding="0,0,4,0"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="PrinterList" Spacing="8" />
+        </ScrollViewer>
+
+        <!--  First run / no printers  -->
+        <StackPanel
+            x:Name="EmptyState"
+            Grid.Row="2"
+            MaxWidth="300"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Spacing="12"
+            Visibility="Collapsed">
+            <FontIcon
+                FontSize="40"
+                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                Glyph="&#xE749;" />
+            <TextBlock
+                HorizontalAlignment="Center"
+                Style="{StaticResource BodyStrongTextBlockStyle}"
+                Text="No printers yet" />
+            <TextBlock
+                HorizontalAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="Add a printer and its progress shows right here, and on the tray icon."
+                TextAlignment="Center"
+                TextWrapping="Wrap" />
+            <Button
+                x:Name="FindButton"
+                HorizontalAlignment="Stretch"
+                Click="FindPrinters_Click"
+                Content="Find printers on my network"
+                Style="{StaticResource AccentButtonStyle}" />
+            <Button
+                HorizontalAlignment="Stretch"
+                Click="AddByAddress_Click"
+                Content="Add by address" />
+        </StackPanel>
 
         <!--  Footer  -->
         <Grid Grid.Row="3">

@@ -1,0 +1,21 @@
+{
+  "model": "K1C",
+  "hostname": "K1C-7A21",
+  "state": 1,
+  "deviceState": 1,
+  "printFileName": "/usr/data/printer_data/gcodes/Cable clip_PLA_32m.gcode",
+  "printProgress": 37,
+  "printJobTime": 720,
+  "printLeftTime": "1260",
+  "layer": 18,
+  "TotalLayer": 60,
+  "nozzleTemp": "220.12",
+  "targetNozzleTemp": 220,
+  "bedTemp0": "59.94",
+  "targetBedTemp0": 60,
+  "boxTemp": 0,
+  "curFeedratePct": 100,
+  "usedMaterialLength": 1520.4,
+  "err": { "errcode": 0, "key": 0 },
+  "withSelfTest": 100
+}

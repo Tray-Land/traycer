@@ -1,0 +1,25 @@
+{
+  "job": {
+    "averagePrintTime": null,
+    "estimatedPrintTime": 8811.3,
+    "filament": { "tool0": { "length": 8104.5, "volume": 19.5 } },
+    "file": {
+      "date": 1729100000,
+      "display": "Benchy 0.2mm PLA.gcode",
+      "name": "benchy_0.2mm_pla.gcode",
+      "origin": "local",
+      "path": "boats/benchy_0.2mm_pla.gcode",
+      "size": 1468987
+    },
+    "lastPrintTime": null,
+    "user": "maker"
+  },
+  "progress": {
+    "completion": 45.678,
+    "filepos": 671000,
+    "printTime": 3600,
+    "printTimeLeft": 4800,
+    "printTimeLeftOrigin": "genius"
+  },
+  "state": "Printing"
+}

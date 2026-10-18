@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TrayCer.Views.DiscoverView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Padding="16,12,12,16" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button
+                x:Name="BackButton"
+                Margin="-8,0,0,0"
+                AutomationProperties.Name="Back"
+                Click="BackButton_Click"
+                Style="{StaticResource FlyoutIconButtonStyle}"
+                ToolTipService.ToolTip="Back">
+                <FontIcon FontSize="14" Glyph="&#xE72B;" />
+            </Button>
+            <TextBlock
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Style="{StaticResource SubtitleTextBlockStyle}"
+                Text="Find printers" />
+            <Button
+                x:Name="ScanButton"
+                Grid.Column="2"
+                AutomationProperties.Name="Search again"
+                Click="ScanButton_Click"
+                Style="{StaticResource FlyoutIconButtonStyle}"
+                ToolTipService.ToolTip="Search again">
+                <FontIcon FontSize="14" Glyph="&#xE72C;" />
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <ProgressRing
+                x:Name="ScanRing"
+                Width="16"
+                Height="16"
+                IsActive="False" />
+            <TextBlock
+                x:Name="ScanText"
+                Grid.Column="1"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                TextWrapping="Wrap" />
+        </Grid>
+
+        <ScrollViewer
+            Grid.Row="2"
+            Margin="0,0,-4,0"
+            Padding="0,0,4,0"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="Results" Spacing="8" />
+        </ScrollViewer>
+
+        <StackPanel
+            x:Name="NothingFound"
+            Grid.Row="2"
+            VerticalAlignment="Center"
+            Spacing="8"
+            Visibility="Collapsed">
+            <TextBlock
+                HorizontalAlignment="Center"
+                Style="{StaticResource BodyStrongTextBlockStyle}"
+                Text="No printers found" />
+            <TextBlock
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="Bambu Lab, Elegoo and FlashForge printers announce themselves. OctoPrint, Klipper and UltiMaker show up when they advertise on the network. Anything else can be added by its address."
+                TextAlignment="Center"
+                TextWrapping="Wrap" />
+        </StackPanel>
+
+        <Button
+            Grid.Row="3"
+            HorizontalAlignment="Stretch"
+            Click="AddByAddress_Click"
+            Content="Add by address" />
+    </Grid>
+</UserControl>

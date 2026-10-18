@@ -1,0 +1,11 @@
+{
+  "result": {
+    "eventtime": 1200.1,
+    "status": {
+      "webhooks": { "state": "shutdown", "state_message": "MCU 'mcu' shutdown: Timer too close\nThis often indicates the host computer is overloaded." },
+      "print_stats": { "filename": "", "state": "standby", "print_duration": 0 },
+      "extruder": { "temperature": 30.1, "target": 0 },
+      "heater_bed": { "temperature": 28.0, "target": 0 }
+    }
+  }
+}

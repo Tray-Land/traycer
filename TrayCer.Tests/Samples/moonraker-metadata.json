@@ -1,0 +1,19 @@
+{
+  "result": {
+    "size": 1832012,
+    "modified": 1729200000.1,
+    "slicer": "OrcaSlicer",
+    "slicer_version": "2.1.1",
+    "layer_height": 0.2,
+    "first_layer_height": 0.2,
+    "object_height": 12.0,
+    "filament_total": 8100.5,
+    "estimated_time": 5400,
+    "thumbnails": [
+      { "width": 32, "height": 32, "size": 2181, "relative_path": ".thumbs/clip_0.2mm_ABS_1h30m-32x32.png" },
+      { "width": 300, "height": 300, "size": 24012, "relative_path": ".thumbs/clip_0.2mm_ABS_1h30m-300x300.png" },
+      { "width": 600, "height": 600, "size": 91002, "relative_path": ".thumbs/clip_0.2mm_ABS_1h30m-600x600.png" }
+    ],
+    "filename": "parts/clip_0.2mm_ABS_1h30m.gcode"
+  }
+}

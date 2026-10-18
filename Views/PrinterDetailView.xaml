@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TrayCer.Views.PrinterDetailView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Padding="16,12,12,16" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button
+                x:Name="BackButton"
+                Margin="-8,0,0,0"
+                AutomationProperties.Name="Back"
+                Click="BackButton_Click"
+                Style="{StaticResource FlyoutIconButtonStyle}"
+                ToolTipService.ToolTip="Back">
+                <FontIcon FontSize="14" Glyph="&#xE72B;" />
+            </Button>
+            <TextBlock
+                x:Name="TitleText"
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Style="{StaticResource SubtitleTextBlockStyle}"
+                TextTrimming="CharacterEllipsis" />
+            <Button
+                x:Name="WebButton"
+                Grid.Column="2"
+                AutomationProperties.Name="Open the printer's web interface"
+                Click="WebButton_Click"
+                Style="{StaticResource FlyoutIconButtonStyle}"
+                ToolTipService.ToolTip="Open the printer's web interface"
+                Visibility="Collapsed">
+                <FontIcon FontSize="14" Glyph="&#xE8A7;" />
+            </Button>
+            <Button
+                Grid.Column="3"
+                AutomationProperties.Name="Edit printer"
+                Click="EditButton_Click"
+                Style="{StaticResource FlyoutIconButtonStyle}"
+                ToolTipService.ToolTip="Edit printer">
+                <FontIcon FontSize="14" Glyph="&#xE70F;" />
+            </Button>
+        </Grid>
+
+        <ScrollViewer
+            Grid.Row="1"
+            Margin="0,0,-4,0"
+            Padding="0,0,4,0"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="12">
+                <!--  Summary  -->
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="8">
+                        <Border
+                            x:Name="ThumbnailFrame"
+                            Height="160"
+                            HorizontalAlignment="Stretch"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                            CornerRadius="4"
+                            Visibility="Collapsed">
+                            <Image x:Name="Thumbnail" Stretch="Uniform" />
+                        </Border>
+                        <TextBlock x:Name="StateText" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <TextBlock
+                            x:Name="JobText"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextWrapping="Wrap"
+                            Visibility="Collapsed" />
+                        <Grid
+                            x:Name="ProgressRow"
+                            ColumnSpacing="8"
+                            Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ProgressBar
+                                x:Name="Progress"
+                                VerticalAlignment="Center"
+                                Maximum="100" />
+                            <TextBlock
+                                x:Name="PercentText"
+                                Grid.Column="1"
+                                Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        </Grid>
+                        <TextBlock
+                            x:Name="TimeText"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Visibility="Collapsed" />
+                        <InfoBar
+                            x:Name="MessageBar"
+                            IsClosable="False"
+                            IsOpen="False" />
+                    </StackPanel>
+                </Border>
+
+                <!--  Optional sections, filled from whatever the printer reports  -->
+                <StackPanel x:Name="TemperatureSection" Spacing="4">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Temperatures" />
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel x:Name="TemperatureRows" Spacing="6" />
+                    </Border>
+                </StackPanel>
+
+                <StackPanel x:Name="DetailSection" Spacing="4">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Details" />
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel x:Name="DetailRows" Spacing="6" />
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Printer" />
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel x:Name="PrinterRows" Spacing="6" />
+                    </Border>
+                </StackPanel>
+
+                <Button
+                    x:Name="RemoveButton"
+                    HorizontalAlignment="Left"
+                    Content="Remove printer">
+                    <Button.Flyout>
+                        <Flyout x:Name="RemoveFlyout">
+                            <StackPanel MaxWidth="260" Spacing="12">
+                                <TextBlock
+                                    x:Name="RemoveQuestion"
+                                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="Its saved access code or key is deleted too."
+                                    TextWrapping="Wrap" />
+                                <Button
+                                    Click="ConfirmRemove_Click"
+                                    Content="Remove"
+                                    Style="{StaticResource AccentButtonStyle}" />
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -1,0 +1,12 @@
+{
+  "status": "printing",
+  "bed": { "temperature": { "current": 59.9, "target": 60.0 }, "type": "glass" },
+  "heads": [
+    {
+      "extruders": [
+        { "hotend": { "id": "AA 0.4", "temperature": { "current": 209.8, "target": 210.0 } } },
+        { "hotend": { "id": "BB 0.4", "temperature": { "current": 120.0, "target": 0.0 } } }
+      ]
+    }
+  ]
+}

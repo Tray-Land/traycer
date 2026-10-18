@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TrayCer.Views.SettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Padding="16,12,12,16" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button
+                x:Name="BackButton"
+                Margin="-8,0,0,0"
+                AutomationProperties.Name="Back"
+                Click="BackButton_Click"
+                Style="{StaticResource FlyoutIconButtonStyle}"
+                ToolTipService.ToolTip="Back">
+                <FontIcon FontSize="14" Glyph="&#xE72B;" />
+            </Button>
+            <TextBlock
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Style="{StaticResource SubtitleTextBlockStyle}"
+                Text="Settings" />
+        </Grid>
+
+        <ScrollViewer
+            Grid.Row="1"
+            Margin="0,0,-4,0"
+            Padding="0,0,4,0"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="4">
+                <TextBlock
+                    Margin="0,0,0,4"
+                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                    Text="General" />
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Start with Windows" />
+                            <TextBlock
+                                x:Name="StartupDescription"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="Keep watching your printers after you sign in."
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            x:Name="StartupToggle"
+                            Grid.Column="1"
+                            MinWidth="0"
+                            AutomationProperties.Name="Start with Windows"
+                            IsEnabled="False"
+                            OffContent=""
+                            OnContent=""
+                            Toggled="StartupToggle_Toggled" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Check printing printers every" />
+                        <ComboBox
+                            x:Name="IntervalBox"
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.Name="Check printing printers every"
+                            SelectionChanged="IntervalBox_SelectionChanged" />
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="Idle printers are checked about once a minute. While this flyout is open, every printer is checked this often."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock
+                    Margin="0,16,0,4"
+                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                    Text="Notifications" />
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Text="When a print finishes"
+                            TextWrapping="Wrap" />
+                        <ToggleSwitch
+                            x:Name="FinishedToggle"
+                            Grid.Column="1"
+                            MinWidth="0"
+                            AutomationProperties.Name="Notify when a print finishes"
+                            OffContent=""
+                            OnContent=""
+                            Toggled="FinishedToggle_Toggled" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="When a print fails or pauses" TextWrapping="Wrap" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="Including filament runouts and printers waiting for you."
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            x:Name="ProblemsToggle"
+                            Grid.Column="1"
+                            MinWidth="0"
+                            AutomationProperties.Name="Notify when a print fails or pauses"
+                            OffContent=""
+                            OnContent=""
+                            Toggled="ProblemsToggle_Toggled" />
+                    </Grid>
+                </Border>
+
+                <TextBlock
+                    x:Name="VersionText"
+                    Margin="0,16,0,0"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

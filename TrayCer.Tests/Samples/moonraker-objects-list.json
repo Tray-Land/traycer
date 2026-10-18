@@ -1,0 +1,10 @@
+{
+  "result": {
+    "objects": [
+      "webhooks", "configfile", "mcu", "gcode_move", "print_stats", "virtual_sdcard", "pause_resume",
+      "display_status", "gcode_macro PRINT_START", "heaters", "extruder", "heater_bed",
+      "heater_fan hotend_fan", "fan", "temperature_sensor raspberry_pi", "temperature_sensor chamber",
+      "toolhead", "motion_report", "query_endstops", "idle_timeout", "system_stats", "bed_mesh"
+    ]
+  }
+}

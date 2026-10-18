@@ -1,0 +1,20 @@
+{
+  "id": 297,
+  "state": "PRINTING",
+  "progress": 42.0,
+  "time_remaining": 3240,
+  "time_printing": 1800,
+  "inaccurate_estimates": false,
+  "file": {
+    "refs": {
+      "icon": "/thumb/s/usb/BENCHY~1.BGC",
+      "thumbnail": "/thumb/l/usb/BENCHY~1.BGC",
+      "download": "/usb/BENCHY~1.BGC"
+    },
+    "name": "BENCHY~1.BGC",
+    "display_name": "benchy_0.4n_0.2mm_PLA_COREONE_1h2m.bgcode",
+    "path": "/usb",
+    "size": 1923311,
+    "m_timestamp": 1729300000
+  }
+}

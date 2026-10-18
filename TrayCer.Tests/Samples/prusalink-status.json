@@ -1,0 +1,16 @@
+{
+  "storage": { "path": "/usb/", "name": "usb", "read_only": false },
+  "printer": {
+    "state": "PRINTING",
+    "temp_bed": 59.9,
+    "target_bed": 60.0,
+    "temp_nozzle": 214.8,
+    "target_nozzle": 215.0,
+    "axis_z": 2.4,
+    "flow": 100,
+    "speed": 120,
+    "fan_hotend": 4500,
+    "fan_print": 3100
+  },
+  "job": { "id": 297, "progress": 42.0, "time_remaining": 3240, "time_printing": 1800 }
+}

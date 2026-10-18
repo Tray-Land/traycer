@@ -1,67 +1,155 @@
-using System.Globalization;
-using System.Net.Http;
+using System.Net.NetworkInformation;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using TrayCer.Core.Monitoring;
+using TrayCer.Core.Presentation;
 using TrayCer.Services;
 
 namespace TrayCer.Views;
 
 /// <summary>
-/// The flyout's content. Its data refreshes only while the flyout is on screen; see
-/// <see cref="ForegroundPoller"/>.
+/// The printer list. Statuses come from <see cref="PrinterHub"/>, which watches the printers
+/// whether or not this is on screen; the page only listens while shown.
 /// </summary>
-public sealed partial class FlyoutPage : Page, IDisposable
+public sealed partial class FlyoutPage : Page, IFlyoutView, IDisposable
 {
-    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(30);
+    // Relative text ("done at", "updated") ages while the flyout sits open.
+    private static readonly TimeSpan ClockInterval = TimeSpan.FromSeconds(30);
 
-    private readonly ForegroundPoller _poller;
+    private readonly TrayFlyoutWindow _host;
+    private readonly Dictionary<string, PrinterCard> _cards = [];
+    private readonly DispatcherQueueTimer _clock;
+    private bool _shown;
 
-    public FlyoutPage()
+    internal FlyoutPage(TrayFlyoutWindow host)
     {
+        _host = host;
         InitializeComponent();
         TitleText.Text = App.DisplayName;
-        _poller = new ForegroundPoller(DispatcherQueue, RefreshInterval, RefreshAsync);
-        _poller.Failed += (_, ex) => ShowError(ex);
+        _clock = DispatcherQueue.CreateTimer();
+        _clock.Interval = ClockInterval;
+        _clock.Tick += Clock_Tick;
     }
 
-    /// <summary>The flyout opened: refresh if the data is stale and poll until it hides.</summary>
-    public void OnShown() => _poller.Start();
-
-    /// <summary>The flyout hid: stop polling and abandon any request in flight.</summary>
-    public void OnHidden() => _poller.Stop();
-
-    public void Dispose() => _poller.Stop();
-
-    private async Task RefreshAsync(CancellationToken cancellationToken)
+    public void OnShown()
     {
-        LoadingRing.IsActive = true;
-        try
+        if (_shown)
         {
-            // Replace with the app's real fetch; pass cancellationToken through to HttpClient.
-            await Task.Delay(TimeSpan.FromMilliseconds(300), cancellationToken);
-            ValueText.Text = DateTime.Now.ToString("t", CultureInfo.CurrentCulture);
-
-            StatusBar.IsOpen = false;
-            UpdatedText.Text = $"Updated {DateTime.Now:t}";
-            App.Current.SetTrayStatus($"Updated {DateTime.Now:t}");
+            return;
         }
-        finally
+
+        _shown = true;
+        App.Current.Hub.Changed += Hub_Changed;
+        ConnectivityService.NetworkStatusChanged += Connectivity_Changed;
+        Render();
+        _clock.Start();
+        if (_cards.Count == 0)
         {
-            LoadingRing.IsActive = false;
+            FindButton.Focus(FocusState.Programmatic);
         }
     }
 
-    private void ShowError(Exception ex)
+    public void OnHidden()
     {
-        bool online = ConnectivityService.IsInternetAvailable;
-        StatusBar.Title = online ? "Can't reach the service" : "No internet connection";
-        StatusBar.Message = ex is HttpRequestException or TaskCanceledException
-            ? online ? "Retrying shortly." : "This will update when you're back online."
-            : ex.Message;
-        StatusBar.IsOpen = true;
+        if (!_shown)
+        {
+            return;
+        }
+
+        _shown = false;
+        App.Current.Hub.Changed -= Hub_Changed;
+        ConnectivityService.NetworkStatusChanged -= Connectivity_Changed;
+        _clock.Stop();
+        foreach (PrinterCard card in _cards.Values)
+        {
+            card.CancelThumbnail();
+        }
     }
 
-    private void RefreshButton_Click(object sender, RoutedEventArgs e) => _ = _poller.RefreshNowAsync();
+    public void Dispose()
+    {
+        OnHidden();
+        _clock.Tick -= Clock_Tick; // The native timer would otherwise keep this page alive.
+        foreach (PrinterCard card in _cards.Values)
+        {
+            card.Dispose();
+        }
 
-    private void SettingsButton_Click(object sender, RoutedEventArgs e) => App.Current.ShowSettings();
+        _cards.Clear();
+        PrinterList.Children.Clear();
+    }
+
+    private void Render()
+    {
+        IReadOnlyList<PrinterStatus> statuses = App.Current.Hub.Statuses;
+        DateTimeOffset now = DateTimeOffset.Now;
+
+        // Keep cards in the saved order, reusing each one so thumbnails and focus survive updates.
+        foreach (string gone in _cards.Keys.Except(statuses.Select(s => s.Config.Id)).ToList())
+        {
+            PrinterList.Children.Remove(_cards[gone]);
+            _cards[gone].Dispose();
+            _cards.Remove(gone);
+        }
+
+        for (int i = 0; i < statuses.Count; i++)
+        {
+            PrinterStatus status = statuses[i];
+            if (!_cards.TryGetValue(status.Config.Id, out PrinterCard? card))
+            {
+                card = new PrinterCard(status.Config.Id);
+                card.Invoked += (_, id) => _host.ShowPrinter(id);
+                _cards[status.Config.Id] = card;
+            }
+
+            int index = PrinterList.Children.IndexOf(card);
+            if (index != i)
+            {
+                if (index >= 0)
+                {
+                    PrinterList.Children.RemoveAt(index);
+                }
+
+                PrinterList.Children.Insert(i, card);
+            }
+
+            card.Update(status, now);
+        }
+
+        bool empty = statuses.Count == 0;
+        EmptyState.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        ListScroller.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
+        RefreshButton.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
+
+        bool offline = !NetworkInterface.GetIsNetworkAvailable();
+        StatusBar.Title = "No network connection";
+        StatusBar.Message = "Printers will update when you're back on your network.";
+        StatusBar.IsOpen = offline && !empty;
+
+        LoadingRing.IsActive = statuses.Any(s => s.Connection == ConnectionState.Connecting);
+        DateTimeOffset? updated = statuses.Max(s => s.LastUpdated);
+        UpdatedText.Text = updated is { } at ? $"Updated {StatusText.ClockTime(at, now)}" : "";
+    }
+
+    private void Hub_Changed(object? sender, EventArgs e) => Render();
+
+    private void Clock_Tick(DispatcherQueueTimer sender, object args) => Render();
+
+    // Raised on a background thread.
+    private void Connectivity_Changed(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (_shown)
+        {
+            Render();
+        }
+    });
+
+    private void RefreshButton_Click(object sender, RoutedEventArgs e) => App.Current.Hub.RefreshAll();
+
+    private void SettingsButton_Click(object sender, RoutedEventArgs e) => _host.ShowSettings();
+
+    private void FindPrinters_Click(object sender, RoutedEventArgs e) => _host.ShowDiscover();
+
+    private void AddByAddress_Click(object sender, RoutedEventArgs e) => _host.ShowAddPrinter();
 }

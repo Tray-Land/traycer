@@ -1,0 +1,5 @@
+[
+  { "active": true, "job": "none", "name": "Delta Tower", "online": 0, "slug": "delta", "paused": false },
+  { "active": true, "job": "lamp_shade.gcode", "jobid": 42, "name": "Prusa i3", "online": 1, "slug": "Prusa_i3", "paused": false,
+    "done": 71.5, "printTime": 10000, "printedTimeComp": 7000, "start": 1729600000, "linesSent": 71000, "totalLines": 100000 }
+]

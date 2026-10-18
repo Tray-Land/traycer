@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10" IgnorableNamespaces="uap uap10 rescap systemai uap5" xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5">
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5" xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10" xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10" IgnorableNamespaces="uap uap10 rescap uap5 com desktop">
   <Identity Name="8D79C190-6412-47B2-B0D9-6385853284D6" Publisher="CN=Joseph Finney, O=Joseph Finney, L=Milwaukee, S=Wisconsin, C=US, PostalCode=53212" Version="1.0.0.0" />
   <Properties>
     <DisplayName>Traycer</DisplayName>
@@ -26,12 +26,24 @@
         <uap5:Extension Category="windows.startupTask">
           <uap5:StartupTask TaskId="TrayCerStartup" Enabled="false" DisplayName="Traycer" />
         </uap5:Extension>
+        <!-- Routes clicks on "print finished" notifications back to the app. -->
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="5D11FCEB-38AE-4D04-876A-84786D44EDB8" />
+        </desktop:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="TrayCer.exe" Arguments="----AppNotificationActivated:" DisplayName="Traycer notifications">
+              <com:Class Id="5D11FCEB-38AE-4D04-876A-84786D44EDB8" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
       </Extensions>
     </Application>
   </Applications>
   <Capabilities>
     <Capability Name="internetClient" />
+    <!-- Printers live on the local network: HTTP, MQTT, WebSockets and UDP discovery. -->
+    <Capability Name="privateNetworkClientServer" />
     <rescap:Capability Name="runFullTrust" />
-    <systemai:Capability Name="systemAIModels" />
   </Capabilities>
 </Package>

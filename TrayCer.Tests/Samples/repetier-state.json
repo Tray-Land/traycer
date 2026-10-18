@@ -1,0 +1,10 @@
+{
+  "Prusa_i3": {
+    "activeExtruder": 0,
+    "extruder": [ { "tempRead": 205.3, "tempSet": 205.0, "output": 80 } ],
+    "heatedBeds": [ { "tempRead": 60.1, "tempSet": 60.0, "output": 30 } ],
+    "layer": 77,
+    "numExtruder": 1,
+    "fanOn": true
+  }
+}

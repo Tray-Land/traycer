@@ -1,0 +1,13 @@
+{
+  "key": "heat",
+  "flags": "d99vn",
+  "result": {
+    "bedHeaters": [0, -1, -1, -1],
+    "chamberHeaters": [-1, -1],
+    "heaters": [
+      { "active": 65, "current": 64.8, "standby": 0, "state": "active" },
+      { "active": 240, "current": 239.5, "standby": 0, "state": "active" },
+      { "active": 180, "current": 25.1, "standby": 0, "state": "off" }
+    ]
+  }
+}

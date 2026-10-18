@@ -1,0 +1,8 @@
+{
+  "job": {
+    "estimatedPrintTime": 8811.3,
+    "file": { "display": "benchy.gcode", "name": "benchy.gcode", "origin": "local", "path": "benchy.gcode" }
+  },
+  "progress": { "completion": 100.0, "filepos": 1468987, "printTime": 8790, "printTimeLeft": 0, "printTimeLeftOrigin": null },
+  "state": "Operational"
+}

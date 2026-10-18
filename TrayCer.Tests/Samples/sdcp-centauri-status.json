@@ -1,0 +1,32 @@
+{
+  "Status": {
+    "CurrentStatus": [1],
+    "TimeLapseStatus": 0,
+    "PlatFormType": 0,
+    "TempOfHotbed": 59.87,
+    "TempOfNozzle": 219.92,
+    "TempOfBox": 33.1,
+    "TempTargetHotbed": 60,
+    "TempTargetNozzle": 220,
+    "TempTargetBox": 0,
+    "CurrenCoord": "110.00,105.50,3.20",
+    "CurrentFanSpeed": { "ModelFan": 100, "ModeFan": 100, "AuxiliaryFan": 60, "BoxFan": 30 },
+    "ZOffset": 0.0,
+    "LightStatus": { "SecondLight": 1, "RgbLight": [0, 0, 0] },
+    "PrintInfo": {
+      "Status": 13,
+      "CurrentLayer": 16,
+      "TotalLayer": 80,
+      "CurrentTicks": 1200,
+      "TotalTicks": 4800,
+      "Filename": "ECC_0.4_Vase_PLA0.2_1h20m.gcode",
+      "ErrorNumber": 0,
+      "TaskId": "8f2b8c60-1d2e-4c5a-9a7e-3f1b2c4d5e6f",
+      "PrintSpeedPct": 100,
+      "Progress": 25
+    }
+  },
+  "MainboardID": "a1b2c3d4e5f60718",
+  "TimeStamp": 1729500000,
+  "Topic": "sdcp/status/a1b2c3d4e5f60718"
+}

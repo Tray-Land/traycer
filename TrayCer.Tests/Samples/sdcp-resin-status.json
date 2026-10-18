@@ -1,0 +1,25 @@
+{
+  "Status": {
+    "CurrentStatus": [1],
+    "PreviousStatus": 0,
+    "PrintScreen": 3600,
+    "ReleaseFilm": 1200,
+    "TempOfUVLED": 41.5,
+    "TimeLapseStatus": 0,
+    "TempOfBox": 28.2,
+    "TempTargetBox": 0,
+    "PrintInfo": {
+      "Status": 3,
+      "CurrentLayer": 300,
+      "TotalLayer": 1200,
+      "CurrentTicks": 1800000,
+      "TotalTicks": 7200000,
+      "Filename": "miniature_set.goo",
+      "ErrorNumber": 0,
+      "TaskId": "xyz"
+    }
+  },
+  "MainboardID": "ffffffff",
+  "TimeStamp": 1729500000,
+  "Topic": "sdcp/status/ffffffff"
+}

@@ -1,0 +1,13 @@
+{
+  "key": "job",
+  "flags": "d99vn",
+  "result": {
+    "build": null,
+    "duration": 2400,
+    "file": { "fileName": "0:/gcodes/bracket.gcode", "size": 2000000, "numLayers": 120, "printTime": 7200, "simulatedTime": null },
+    "filePosition": 700000,
+    "layer": 40,
+    "timesLeft": { "file": 4500, "filament": 4700, "slicer": 4800 },
+    "lastFileName": "0:/gcodes/previous.gcode"
+  }
+}
