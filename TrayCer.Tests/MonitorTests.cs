@@ -13,7 +13,7 @@ public sealed class MonitorTests
     private static readonly PrinterConfig Config = new("id", "Voron", PrinterKind.Moonraker, "10.0.0.9");
 
     [TestMethod]
-    public async Task Poll_ReportsEventsAndRaisesAttentionOnFinish()
+    public async Task Poll_ReportsEventsAndAFinishWaitsToBeMarkedComplete()
     {
         ScriptedDriver driver = new(
             new PrinterSnapshot { State = PrinterState.Printing, Progress = 0.9, JobName = "part.gcode" },
@@ -28,10 +28,44 @@ public sealed class MonitorTests
         Assert.IsNull(updates[0].Event, "The first reading is a baseline, not news.");
         Assert.AreEqual(PrintEventKind.Finished, updates[1].Event!.Kind);
         Assert.AreEqual("part.gcode", updates[1].Event!.JobName, "The job name carries over from the previous reading.");
-        Assert.AreEqual(AttentionLevel.Done, monitor.Status.Attention);
+        Assert.IsTrue(monitor.Status.NeedsMarkComplete);
         Assert.AreEqual(ConnectionState.Connected, monitor.Status.Connection);
 
-        Assert.AreEqual(AttentionLevel.None, monitor.Acknowledge().Attention);
+        Assert.IsTrue(monitor.Acknowledge().NeedsMarkComplete, "Opening the flyout doesn't count as marking it complete.");
+        Assert.IsFalse(monitor.MarkComplete().NeedsMarkComplete);
+
+        await monitor.PollOnceAsync();
+        Assert.IsFalse(monitor.Status.NeedsMarkComplete, "Still finished at the printer, but the user has dealt with it.");
+    }
+
+    [TestMethod]
+    public async Task Poll_TheNextPrintClearsAFinishNotMarkedComplete()
+    {
+        ScriptedDriver driver = new(
+            new PrinterSnapshot { State = PrinterState.Printing, Progress = 0.9 },
+            new PrinterSnapshot { State = PrinterState.Finished, Progress = 1 },
+            new PrinterSnapshot { State = PrinterState.Printing, Progress = 0.01 });
+        await using PrinterMonitor monitor = new(Config, driver, new MonitorOptions());
+
+        await monitor.PollOnceAsync();
+        await monitor.PollOnceAsync();
+        Assert.IsTrue(monitor.Status.NeedsMarkComplete);
+
+        await monitor.PollOnceAsync();
+        Assert.IsFalse(monitor.Status.NeedsMarkComplete);
+    }
+
+    [TestMethod]
+    public async Task Poll_ARestoredFinishStaysUntilANewPrintIsSeen()
+    {
+        await using PrinterMonitor waiting = new(Config, new ScriptedDriver(new PrinterSnapshot { State = PrinterState.Idle }), new MonitorOptions(), needsMarkComplete: true);
+        Assert.IsTrue(waiting.Status.NeedsMarkComplete, "Shown before the first reading arrives.");
+        await waiting.PollOnceAsync();
+        Assert.IsTrue(waiting.Status.NeedsMarkComplete);
+
+        await using PrinterMonitor moved = new(Config, new ScriptedDriver(new PrinterSnapshot { State = PrinterState.Printing, Progress = 0.2 }), new MonitorOptions(), needsMarkComplete: true);
+        await moved.PollOnceAsync();
+        Assert.IsFalse(moved.Status.NeedsMarkComplete, "The next print started while the app was closed.");
     }
 
     [TestMethod]

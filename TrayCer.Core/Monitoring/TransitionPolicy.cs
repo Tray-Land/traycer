@@ -36,15 +36,29 @@ public static class TransitionPolicy
     }
 
     /// <summary>
-    /// How an event changes what the tray flags. Finishing and problems raise a flag; starting or
-    /// cancelling a print at the printer means the user is there, so the flag drops.
+    /// How an event changes what the tray flags. Problems raise a flag; starting or cancelling a
+    /// print at the printer means the user is there, so the flag drops. Finishing is tracked apart,
+    /// by <see cref="NeedsMarkCompleteAfter"/>.
     /// </summary>
     public static AttentionLevel AttentionAfter(PrintEventKind? kind, AttentionLevel current) => kind switch
     {
-        PrintEventKind.Finished => Max(current, AttentionLevel.Done),
         PrintEventKind.Failed or PrintEventKind.Error => AttentionLevel.Error,
         PrintEventKind.NeedsAttention => Max(current, AttentionLevel.Warning),
         PrintEventKind.Started or PrintEventKind.Cancelled => AttentionLevel.None,
+        _ => current,
+    };
+
+    /// <summary>
+    /// Whether a finished print still waits for the user to mark it complete after a reading.
+    /// Finishing raises it. A new print means the plate was cleared, and so does a first reading
+    /// that finds one under way (the flag is restored from settings when the app starts, and the
+    /// user may have started the next print while it was closed). Otherwise only the user drops it.
+    /// </summary>
+    public static bool NeedsMarkCompleteAfter(PrintEventKind? kind, PrinterSnapshot? previous, PrinterSnapshot next, bool current) => kind switch
+    {
+        PrintEventKind.Finished => true,
+        PrintEventKind.Started => false,
+        _ when previous is null && next.State is PrinterState.Printing or PrinterState.Preparing => false,
         _ => current,
     };
 

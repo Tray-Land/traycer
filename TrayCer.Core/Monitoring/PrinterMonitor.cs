@@ -30,12 +30,13 @@ public sealed class PrinterMonitor : IAsyncDisposable
     private int _failures;
     private volatile bool _foreground;
 
-    public PrinterMonitor(PrinterConfig config, IPrinterDriver driver, MonitorOptions options, TimeProvider? time = null)
+    /// <param name="needsMarkComplete">A finished print from before this monitor started (the app restarted, or the printer was edited) that the user still has to mark complete.</param>
+    public PrinterMonitor(PrinterConfig config, IPrinterDriver driver, MonitorOptions options, TimeProvider? time = null, bool needsMarkComplete = false)
     {
         _driver = driver;
         _options = options;
         _time = time ?? TimeProvider.System;
-        _status = new PrinterStatus { Config = config };
+        _status = new PrinterStatus { Config = config, NeedsMarkComplete = needsMarkComplete };
     }
 
     public event EventHandler<PrinterUpdate>? Updated;
@@ -95,12 +96,22 @@ public sealed class PrinterMonitor : IAsyncDisposable
         RefreshNow();
     }
 
-    /// <summary>The user has seen this printer's news; drop the tray flag.</summary>
+    /// <summary>The user has seen this printer's news; drop the tray flag. A finished print stays until <see cref="MarkComplete"/>.</summary>
     public PrinterStatus Acknowledge()
     {
         lock (_gate)
         {
             _status = _status with { Attention = AttentionLevel.None };
+            return _status;
+        }
+    }
+
+    /// <summary>The user has dealt with the finished print; the tray goes back to normal.</summary>
+    public PrinterStatus MarkComplete()
+    {
+        lock (_gate)
+        {
+            _status = _status with { NeedsMarkComplete = false };
             return _status;
         }
     }
@@ -200,6 +211,7 @@ public sealed class PrinterMonitor : IAsyncDisposable
         PrintEvent? printEvent = kind is { } k
             ? new PrintEvent(k, snapshot.JobName ?? _lastGood?.JobName, snapshot.Message, now)
             : null;
+        PrinterSnapshot? previous = _lastGood;
         _lastGood = snapshot;
 
         lock (_gate)
@@ -212,6 +224,7 @@ public sealed class PrinterMonitor : IAsyncDisposable
                 LastUpdated = now,
                 LastEvent = printEvent ?? _status.LastEvent,
                 Attention = TransitionPolicy.AttentionAfter(kind, _status.Attention),
+                NeedsMarkComplete = TransitionPolicy.NeedsMarkCompleteAfter(kind, previous, snapshot, _status.NeedsMarkComplete),
             };
             return new PrinterUpdate(_status, printEvent);
         }

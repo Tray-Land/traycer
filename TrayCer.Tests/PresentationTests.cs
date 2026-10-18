@@ -7,12 +7,13 @@ namespace TrayCer.Tests;
 [TestClass]
 public sealed class PresentationTests
 {
-    private static PrinterStatus Status(string name, PrinterState state, double? progress = null, TimeSpan? remaining = null, AttentionLevel attention = AttentionLevel.None) => new()
+    private static PrinterStatus Status(string name, PrinterState state, double? progress = null, TimeSpan? remaining = null, AttentionLevel attention = AttentionLevel.None, bool needsMarkComplete = false) => new()
     {
         Config = new PrinterConfig(name, name, PrinterKind.Moonraker, "10.0.0.1"),
         Snapshot = new PrinterSnapshot { State = state, Progress = progress, Remaining = remaining },
         Connection = ConnectionState.Connected,
         Attention = attention,
+        NeedsMarkComplete = needsMarkComplete,
     };
 
     [TestMethod]
@@ -47,11 +48,12 @@ public sealed class PresentationTests
     {
         PrinterStatus printing = Status("A", PrinterState.Printing, 0.4, TimeSpan.FromHours(2));
         PrinterStatus paused = Status("B", PrinterState.Paused, 0.7);
-        PrinterStatus done = Status("C", PrinterState.Finished, 1, attention: AttentionLevel.Done);
+        PrinterStatus done = Status("C", PrinterState.Finished, 1, needsMarkComplete: true);
         PrinterStatus failed = Status("D", PrinterState.Error, attention: AttentionLevel.Error);
 
         Assert.AreEqual(TrayGlyph.Error, TrayIndicator.Compute([printing, paused, done, failed], "Traycer").Glyph);
         Assert.AreEqual(TrayGlyph.Done, TrayIndicator.Compute([printing, paused, done], "Traycer").Glyph);
+        Assert.AreEqual(TrayGlyph.Paused, TrayIndicator.Compute([printing, paused, done with { NeedsMarkComplete = false }], "Traycer").Glyph, "Marked complete: back to normal.");
         TrayIndicator pausedIcon = TrayIndicator.Compute([printing, paused], "Traycer");
         Assert.AreEqual(TrayGlyph.Paused, pausedIcon.Glyph);
         Assert.AreEqual(0.7, pausedIcon.Progress);
@@ -73,10 +75,12 @@ public sealed class PresentationTests
     public void Tooltip_ListsNewsFirstAndFitsTheShellLimit()
     {
         PrinterStatus printing = Status("Voron", PrinterState.Printing, 0.456, TimeSpan.FromMinutes(80));
-        PrinterStatus done = Status("P1S", PrinterState.Finished, 1, attention: AttentionLevel.Done);
+        PrinterStatus done = Status("P1S", PrinterState.Finished, 1, needsMarkComplete: true);
+        PrinterStatus broken = Status("K1", PrinterState.Error, attention: AttentionLevel.Error, needsMarkComplete: true);
 
         string tooltip = TrayIndicator.Compute([printing, done], "Traycer").Tooltip;
         Assert.AreEqual("Traycer\nP1S: Finished\nVoron: 45% · 1h 20m left", tooltip);
+        Assert.AreEqual("Traycer\nK1: Error\nP1S: Finished\nVoron: 45% · 1h 20m left", TrayIndicator.Compute([printing, done, broken], "Traycer").Tooltip, "One line per printer, problems first.");
 
         List<PrinterStatus> many = [.. Enumerable.Range(1, 12).Select(i => Status($"Printer with a long name {i}", PrinterState.Printing, 0.5, TimeSpan.FromHours(i)))];
         string crowded = TrayIndicator.Compute(many, "Traycer").Tooltip;
@@ -88,6 +92,7 @@ public sealed class PresentationTests
     public void Tooltip_SummarizesAnIdleFleet()
     {
         Assert.AreEqual("Traycer\nAll printers idle", TrayIndicator.Compute([Status("A", PrinterState.Idle), Status("B", PrinterState.Idle)], "Traycer").Tooltip);
+        Assert.AreEqual("Traycer\nB: Finished\nA: Idle", TrayIndicator.Compute([Status("A", PrinterState.Idle), Status("B", PrinterState.Idle, needsMarkComplete: true)], "Traycer").Tooltip, "Back to idle, but not marked complete.");
         Assert.AreEqual("Traycer\nNo printers yet", TrayIndicator.Compute([], "Traycer").Tooltip);
     }
 

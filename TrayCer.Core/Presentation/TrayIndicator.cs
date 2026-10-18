@@ -14,7 +14,7 @@ public enum TrayGlyph
     /// <summary>Pause bars over a progress bar.</summary>
     Paused,
 
-    /// <summary>A green check: something finished since the flyout was last opened.</summary>
+    /// <summary>A green check: a print finished and hasn't been marked complete.</summary>
     Done,
 
     /// <summary>An amber "!": a printer is waiting on the user.</summary>
@@ -30,8 +30,8 @@ public sealed record TrayIndicator(TrayGlyph Glyph, double? Progress, string Too
     public const int MaxTooltipLength = 127; // NOTIFYICONDATA.szTip
 
     /// <summary>
-    /// One icon for many printers, most urgent first: errors, then waiting-on-you, then finished,
-    /// then a paused print, then the print that will finish soonest.
+    /// One icon for many printers, most urgent first: errors, then waiting-on-you, then finished
+    /// and not yet marked complete, then a paused print, then the print that will finish soonest.
     /// </summary>
     public static TrayIndicator Compute(IReadOnlyList<PrinterStatus> printers, string appName)
     {
@@ -47,7 +47,7 @@ public sealed record TrayIndicator(TrayGlyph Glyph, double? Progress, string Too
             return new TrayIndicator(TrayGlyph.Warning, null, tooltip);
         }
 
-        if (printers.Any(p => p.Attention == AttentionLevel.Done))
+        if (printers.Any(p => p.NeedsMarkComplete))
         {
             return new TrayIndicator(TrayGlyph.Done, null, tooltip);
         }
@@ -79,17 +79,18 @@ public sealed record TrayIndicator(TrayGlyph Glyph, double? Progress, string Too
             return $"{appName}\nNo printers yet";
         }
 
-        if (printers.Count > 1 && printers.All(p => p.Attention == AttentionLevel.None && p.HasReading && p.Snapshot!.State == PrinterState.Idle))
+        if (printers.Count > 1 && printers.All(p => p.Attention == AttentionLevel.None && !p.NeedsMarkComplete && p.HasReading && p.Snapshot!.State == PrinterState.Idle))
         {
             return $"{appName}\nAll printers idle";
         }
 
+        // Each printer in at most one group: problems, then finished, then printing, then paused.
         List<PrinterStatus> ordered =
         [
             .. printers.Where(p => p.Attention is AttentionLevel.Error or AttentionLevel.Warning),
-            .. printers.Where(p => p.Attention == AttentionLevel.Done),
-            .. Printing(printers).Where(p => p.Attention == AttentionLevel.None),
-            .. printers.Where(p => p.Attention == AttentionLevel.None && p.HasReading && p.Snapshot!.State is PrinterState.Paused or PrinterState.Attention),
+            .. printers.Where(p => p.Attention == AttentionLevel.None && p.NeedsMarkComplete),
+            .. Printing(printers).Where(p => p.Attention == AttentionLevel.None && !p.NeedsMarkComplete),
+            .. printers.Where(p => p.Attention == AttentionLevel.None && !p.NeedsMarkComplete && p.HasReading && p.Snapshot!.State is PrinterState.Paused or PrinterState.Attention),
         ];
         ordered.AddRange(printers.Except(ordered));
 

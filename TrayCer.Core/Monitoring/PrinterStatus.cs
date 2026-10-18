@@ -39,7 +39,6 @@ public sealed record PrintEvent(PrintEventKind Kind, string? JobName, string? Me
 public enum AttentionLevel
 {
     None,
-    Done,
     Warning,
     Error,
 }
@@ -65,6 +64,13 @@ public sealed record PrinterStatus
     public PrintEvent? LastEvent { get; init; }
 
     public AttentionLevel Attention { get; init; }
+
+    /// <summary>
+    /// A print finished and the user hasn't marked it complete. Unlike <see cref="Attention"/>,
+    /// opening the flyout doesn't clear it: the tray stays green until the user says the print is
+    /// dealt with, or the next print starts.
+    /// </summary>
+    public bool NeedsMarkComplete { get; init; }
 
     /// <summary>True when the reading can be shown as current.</summary>
     public bool HasReading => Snapshot is not null && Connection is ConnectionState.Connected or ConnectionState.Reconnecting;

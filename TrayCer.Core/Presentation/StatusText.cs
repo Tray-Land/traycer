@@ -97,7 +97,7 @@ public static class StatusText
     public static string TooltipLine(PrinterStatus status)
     {
         string name = status.Config.Name;
-        if (status.Attention == AttentionLevel.Done && status.DisplayState is PrinterState.Finished or PrinterState.Idle)
+        if (status.NeedsMarkComplete && status.DisplayState is PrinterState.Finished or PrinterState.Idle)
         {
             return $"{name}: Finished";
         }
