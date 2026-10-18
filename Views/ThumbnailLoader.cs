@@ -1,18 +1,17 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Storage.Streams;
 
 namespace TrayCer.Views;
 
 /// <summary>
-/// Shows a job preview in an <see cref="Image"/>, fetched through the hub (it may need the
+/// Shows a job preview in a <see cref="BuildPreview"/>, fetched through the hub (it may need the
 /// printer's credentials) and decoded at display size. The frame stays collapsed until there's a
 /// picture, so printers without previews never leave a gap.
 /// </summary>
-internal sealed class ThumbnailLoader(Image image, FrameworkElement frame, int decodeWidth)
+internal sealed class ThumbnailLoader(BuildPreview image, FrameworkElement frame, int decodeWidth)
 {
     private CancellationTokenSource? _load;
     private string? _url;
@@ -24,7 +23,8 @@ internal sealed class ThumbnailLoader(Image image, FrameworkElement frame, int d
             return;
         }
 
-        Cancel();
+        _load?.Cancel();
+        _load = null;
         _url = url;
         if (url is null)
         {
@@ -66,14 +66,31 @@ internal sealed class ThumbnailLoader(Image image, FrameworkElement frame, int d
                 Clear();
             }
         }
+        finally
+        {
+            if (_load == load)
+            {
+                _load = null;
+            }
+        }
     }
 
-    /// <summary>Stops a load in flight; the next <see cref="Load"/> starts over.</summary>
+    /// <summary>
+    /// Stops a load in flight, so the next <see cref="Load"/> starts over. A picture that already
+    /// finished loading stays, and so does its URL, so the next Load still notices if the printer
+    /// has dropped the job in the meantime.
+    /// </summary>
     public void Cancel()
     {
-        _load?.Cancel();
+        if (_load is null)
+        {
+            return;
+        }
+
+        _load.Cancel();
         _load = null;
         _url = null;
+        Clear(); // Start over from a blank frame, not from an older job's picture.
     }
 
     private void Clear()

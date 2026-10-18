@@ -2,6 +2,7 @@
 <UserControl
     x:Class="TrayCer.Views.PrinterDetailView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:local="using:TrayCer.Views"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid Padding="16,12,12,16" RowSpacing="12">
@@ -58,63 +59,64 @@
             Padding="0,0,4,0"
             VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="12">
-                <!--  Summary  -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <StackPanel Spacing="8">
-                        <Border
-                            x:Name="ThumbnailFrame"
-                            Height="160"
-                            HorizontalAlignment="Stretch"
-                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                            CornerRadius="4"
-                            Visibility="Collapsed">
-                            <Image x:Name="Thumbnail" Stretch="Uniform" />
-                        </Border>
-                        <TextBlock x:Name="StateText" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                        <TextBlock
-                            x:Name="JobText"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            TextWrapping="Wrap"
-                            Visibility="Collapsed" />
-                        <Grid
-                            x:Name="ProgressRow"
-                            ColumnSpacing="8"
-                            Visibility="Collapsed">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <ProgressBar
-                                x:Name="Progress"
-                                VerticalAlignment="Center"
-                                Maximum="100" />
+                <!--  Summary, with the wash Mark as complete scrapes off it  -->
+                <Grid>
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Spacing="8">
+                            <!--  Job preview, built up as the print goes  -->
+                            <Border
+                                x:Name="ThumbnailFrame"
+                                Height="160"
+                                HorizontalAlignment="Stretch"
+                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                CornerRadius="4"
+                                Visibility="Collapsed">
+                                <local:BuildPreview x:Name="Thumbnail" />
+                            </Border>
+                            <TextBlock x:Name="StateText" Style="{StaticResource BodyStrongTextBlockStyle}" />
                             <TextBlock
-                                x:Name="PercentText"
-                                Grid.Column="1"
-                                Style="{StaticResource BodyStrongTextBlockStyle}" />
-                        </Grid>
-                        <TextBlock
-                            x:Name="TimeText"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Style="{StaticResource CaptionTextBlockStyle}"
-                            Visibility="Collapsed" />
-                        <InfoBar
-                            x:Name="MessageBar"
-                            IsClosable="False"
-                            IsOpen="False" />
-                        <Button
-                            x:Name="CompleteButton"
-                            AutomationProperties.Name="Mark as complete"
-                            Click="CompleteButton_Click"
-                            Style="{StaticResource AccentButtonStyle}"
-                            Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontSize="14" Glyph="&#xE73E;" />
-                                <TextBlock Text="Mark as complete" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </Border>
+                                x:Name="JobText"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <Grid
+                                x:Name="ProgressRow"
+                                ColumnSpacing="8"
+                                Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <local:PrintProgressBar x:Name="Progress" VerticalAlignment="Center" />
+                                <TextBlock
+                                    x:Name="PercentText"
+                                    Grid.Column="1"
+                                    Style="{StaticResource BodyStrongTextBlockStyle}" />
+                            </Grid>
+                            <TextBlock
+                                x:Name="TimeText"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Visibility="Collapsed" />
+                            <InfoBar
+                                x:Name="MessageBar"
+                                IsClosable="False"
+                                IsOpen="False" />
+                            <Button
+                                x:Name="CompleteButton"
+                                AutomationProperties.Name="Mark as complete"
+                                Click="CompleteButton_Click"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="14" Glyph="&#xE73E;" />
+                                    <TextBlock Text="Mark as complete" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                    <local:PlateWipe x:Name="Wipe" />
+                </Grid>
 
                 <!--  Optional sections, filled from whatever the printer reports  -->
                 <StackPanel x:Name="TemperatureSection" Spacing="4">

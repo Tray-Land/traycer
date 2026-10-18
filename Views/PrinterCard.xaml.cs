@@ -42,10 +42,7 @@ public sealed partial class PrinterCard : UserControl, IDisposable
         ProgressRow.Visibility = running || snapshot?.State == PrinterState.Finished ? Visibility.Visible : Visibility.Collapsed;
         if (snapshot is not null)
         {
-            Progress.IsIndeterminate = running && (snapshot.Progress is null || snapshot.State == PrinterState.Preparing);
-            Progress.Value = (snapshot.Progress ?? 0) * 100;
-            Progress.ShowPaused = snapshot.State is PrinterState.Paused or PrinterState.Attention;
-            Progress.ShowError = false;
+            Progress.Update(snapshot, running);
             PercentText.Text = snapshot.Progress is { } p ? StatusText.Percent(p) : "";
         }
 
@@ -53,6 +50,11 @@ public sealed partial class PrinterCard : UserControl, IDisposable
         Show(MessageText, MessageFor(status, now));
         Show(FactsText, snapshot is null ? null : Facts(snapshot));
         _thumbnail.Load(_printerId, snapshot?.ThumbnailUrl);
+        if (snapshot is not null)
+        {
+            Thumbnail.Show(BuildProgress.Built(snapshot, status.NeedsMarkComplete), snapshot.State == PrinterState.Printing);
+        }
+
         CompleteSpacer.Visibility = CompleteButton.Visibility = status.NeedsMarkComplete ? Visibility.Visible : Visibility.Collapsed;
 
         // Read the card the way it looks: name, state, then whatever lines are showing.
@@ -66,9 +68,14 @@ public sealed partial class PrinterCard : UserControl, IDisposable
         AutomationProperties.SetName(CardButton, string.Join(", ", spoken));
     }
 
-    public void CancelThumbnail() => _thumbnail.Cancel();
+    /// <summary>The list went off screen: stop a preview download in flight, and the nozzle's glow.</summary>
+    public void OnHidden()
+    {
+        _thumbnail.Cancel();
+        Progress.Stop();
+    }
 
-    public void Dispose() => _thumbnail.Cancel();
+    public void Dispose() => OnHidden();
 
     /// <summary>Layer and temperatures in one quiet line: "Layer 45 of 200 · Nozzle 215° · Bed 60°".</summary>
     internal static string? Facts(PrinterSnapshot snapshot)
@@ -177,6 +184,7 @@ public sealed partial class PrinterCard : UserControl, IDisposable
     {
         // The button hides with the flag; keep focus on the card instead of losing it.
         CardButton.Focus(FocusState.Programmatic);
+        Wipe.Play();
         App.Current.Hub.MarkComplete(_printerId);
     }
 }

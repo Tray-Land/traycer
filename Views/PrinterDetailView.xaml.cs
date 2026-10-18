@@ -17,6 +17,8 @@ public sealed partial class PrinterDetailView : UserControl, IFlyoutView, IDispo
     private readonly TrayFlyoutWindow _host;
     private readonly string _printerId;
     private readonly ThumbnailLoader _thumbnail;
+    private readonly List<(TextBlock Value, ProgressBar Bar)> _heaters = [];
+    private string[] _heaterLabels = [];
     private bool _shown;
 
     internal PrinterDetailView(TrayFlyoutWindow host, string printerId)
@@ -50,6 +52,7 @@ public sealed partial class PrinterDetailView : UserControl, IFlyoutView, IDispo
         _shown = false;
         App.Current.Hub.Changed -= Hub_Changed;
         _thumbnail.Cancel();
+        Progress.Stop();
     }
 
     public void Dispose() => OnHidden();
@@ -76,9 +79,7 @@ public sealed partial class PrinterDetailView : UserControl, IFlyoutView, IDispo
         ProgressRow.Visibility = running || snapshot?.State == PrinterState.Finished ? Visibility.Visible : Visibility.Collapsed;
         if (snapshot is not null)
         {
-            Progress.IsIndeterminate = running && (snapshot.Progress is null || snapshot.State == PrinterState.Preparing);
-            Progress.Value = (snapshot.Progress ?? 0) * 100;
-            Progress.ShowPaused = snapshot.State is PrinterState.Paused or PrinterState.Attention;
+            Progress.Update(snapshot, running);
             PercentText.Text = snapshot.Progress is { } p ? StatusText.Percent(p) : "";
         }
 
@@ -86,8 +87,12 @@ public sealed partial class PrinterDetailView : UserControl, IFlyoutView, IDispo
         ShowMessage(status);
         CompleteButton.Visibility = status.NeedsMarkComplete ? Visibility.Visible : Visibility.Collapsed;
         _thumbnail.Load(_printerId, snapshot?.ThumbnailUrl);
+        if (snapshot is not null)
+        {
+            Thumbnail.Show(BuildProgress.Built(snapshot, status.NeedsMarkComplete), snapshot.State == PrinterState.Printing);
+        }
 
-        Fill(TemperatureSection, TemperatureRows, snapshot?.Temperatures.Select(t => (t.Label, TemperatureText(t), (string?)null)) ?? []);
+        FillTemperatures(snapshot);
         Fill(DetailSection, DetailRows, snapshot?.Details.Select(d => (d.Label, d.Value, d.Color)) ?? []);
 
         List<(string, string, string?)> printer =
@@ -157,31 +162,47 @@ public sealed partial class PrinterDetailView : UserControl, IFlyoutView, IDispo
         MessageBar.IsOpen = title is not null || message is not null;
     }
 
+    /// <summary>
+    /// The temperature rows, each with a bar while its heater climbs to its target. The rows are
+    /// kept from one update to the next, so a bar eases along instead of starting over.
+    /// </summary>
+    private void FillTemperatures(PrinterSnapshot? snapshot)
+    {
+        IReadOnlyList<TemperatureReading> readings = snapshot?.Temperatures ?? [];
+        if (!readings.Select(t => t.Label).SequenceEqual(_heaterLabels))
+        {
+            _heaterLabels = [.. readings.Select(t => t.Label)];
+            _heaters.Clear();
+            TemperatureRows.Children.Clear();
+            foreach (TemperatureReading reading in readings)
+            {
+                (Grid row, TextBlock value) = Row(reading.Label, null);
+                ProgressBar bar = new() { Style = (Style)Application.Current.Resources["HeaterBarStyle"] };
+                TemperatureRows.Children.Add(new StackPanel { Spacing = 4, Children = { row, bar } });
+                _heaters.Add((value, bar));
+            }
+        }
+
+        for (int i = 0; i < readings.Count; i++)
+        {
+            TemperatureReading reading = readings[i];
+            (TextBlock value, ProgressBar bar) = _heaters[i];
+            value.Text = TemperatureText(reading);
+            bar.Value = reading.HeatProgress ?? 0;
+            bar.Visibility = BuildProgress.ShowsHeat(reading, snapshot!.State) ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        TemperatureSection.Visibility = readings.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     /// <summary>Replaces a section's rows: label on the left, value on the right, an optional color swatch.</summary>
     private static void Fill(FrameworkElement? section, StackPanel rows, IEnumerable<(string Label, string Value, string? Color)> items)
     {
         rows.Children.Clear();
-        foreach ((string label, string value, string? color) in items)
+        foreach ((string label, string text, string? color) in items)
         {
-            Grid row = new() { ColumnSpacing = 12 };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            TextBlock name = new() { Text = label, Style = (Style)Application.Current.Resources["DetailLabelTextStyle"] };
-            StackPanel right = new() { Orientation = Orientation.Horizontal, Spacing = 6, HorizontalAlignment = HorizontalAlignment.Right };
-            if (ParseColor(color) is { } swatch)
-            {
-                right.Children.Add(new Ellipse
-                {
-                    Style = (Style)Application.Current.Resources["SwatchStyle"],
-                    Fill = new SolidColorBrush(swatch),
-                });
-            }
-
-            right.Children.Add(new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right, IsTextSelectionEnabled = true });
-            Grid.SetColumn(right, 1);
-            row.Children.Add(name);
-            row.Children.Add(right);
+            (Grid row, TextBlock value) = Row(label, color);
+            value.Text = text;
             rows.Children.Add(row);
         }
 
@@ -189,6 +210,32 @@ public sealed partial class PrinterDetailView : UserControl, IFlyoutView, IDispo
         {
             section.Visibility = rows.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
+    }
+
+    /// <summary>One row: the label on the left, an empty value on the right with an optional color swatch before it.</summary>
+    private static (Grid Row, TextBlock Value) Row(string label, string? color)
+    {
+        Grid row = new() { ColumnSpacing = 12 };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        TextBlock name = new() { Text = label, Style = (Style)Application.Current.Resources["DetailLabelTextStyle"] };
+        StackPanel right = new() { Orientation = Orientation.Horizontal, Spacing = 6, HorizontalAlignment = HorizontalAlignment.Right };
+        if (ParseColor(color) is { } swatch)
+        {
+            right.Children.Add(new Ellipse
+            {
+                Style = (Style)Application.Current.Resources["SwatchStyle"],
+                Fill = new SolidColorBrush(swatch),
+            });
+        }
+
+        TextBlock value = new() { TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right, IsTextSelectionEnabled = true };
+        right.Children.Add(value);
+        Grid.SetColumn(right, 1);
+        row.Children.Add(name);
+        row.Children.Add(right);
+        return (row, value);
     }
 
     private static Color? ParseColor(string? hex) =>
@@ -210,6 +257,7 @@ public sealed partial class PrinterDetailView : UserControl, IFlyoutView, IDispo
     {
         // The button hides with the flag; keep focus in the page instead of losing it.
         BackButton.Focus(FocusState.Programmatic);
+        Wipe.Play();
         App.Current.Hub.MarkComplete(_printerId);
     }
 

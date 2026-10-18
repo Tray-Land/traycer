@@ -63,7 +63,7 @@ public sealed partial class FlyoutPage : Page, IFlyoutView, IDisposable
         _clock.Stop();
         foreach (PrinterCard card in _cards.Values)
         {
-            card.CancelThumbnail();
+            card.OnHidden();
         }
     }
 

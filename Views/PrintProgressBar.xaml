@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TrayCer.Views.PrintProgressBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <!--  The hot nozzle's glow, breathing while it prints  -->
+        <Storyboard
+            x:Name="Glow"
+            AutoReverse="True"
+            RepeatBehavior="Forever">
+            <DoubleAnimation
+                Storyboard.TargetName="Halo"
+                Storyboard.TargetProperty="Opacity"
+                From="0.15"
+                To="0.5"
+                Duration="0:0:0.9" />
+            <DoubleAnimation
+                Storyboard.TargetName="HaloScale"
+                Storyboard.TargetProperty="ScaleX"
+                From="0.7"
+                To="1.1"
+                Duration="0:0:0.9" />
+            <DoubleAnimation
+                Storyboard.TargetName="HaloScale"
+                Storyboard.TargetProperty="ScaleY"
+                From="0.7"
+                To="1.1"
+                Duration="0:0:0.9" />
+        </Storyboard>
+    </UserControl.Resources>
+
+    <Grid>
+        <ProgressBar
+            x:Name="Bar"
+            VerticalAlignment="Center"
+            Maximum="100"
+            SizeChanged="Bar_SizeChanged" />
+
+        <!--  The nozzle riding the bar's leading edge; centered on x = 0, then moved along by Translation  -->
+        <Grid
+            x:Name="Nozzle"
+            Width="12"
+            Height="12"
+            Margin="-6,0,0,0"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Center"
+            AutomationProperties.AccessibilityView="Raw"
+            IsHitTestVisible="False"
+            Visibility="Collapsed">
+            <Ellipse
+                x:Name="Halo"
+                Fill="{ThemeResource AccentFillColorDefaultBrush}"
+                Opacity="0.3"
+                RenderTransformOrigin="0.5,0.5">
+                <Ellipse.RenderTransform>
+                    <ScaleTransform x:Name="HaloScale" />
+                </Ellipse.RenderTransform>
+            </Ellipse>
+            <Ellipse
+                Width="5"
+                Height="5"
+                Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+        </Grid>
+    </Grid>
+</UserControl>

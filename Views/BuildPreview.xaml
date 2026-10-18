@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="TrayCer.Views.BuildPreview"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--  Sized to the picture itself, so the clip and the print head line up with it rather than the frame  -->
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+        <!--  What's still to print  -->
+        <Image
+            x:Name="Ghost"
+            Opacity="0.3"
+            Stretch="Uniform" />
+        <!--  What's on the plate, clipped from the top down to the layer being printed  -->
+        <Image x:Name="Built" Stretch="Uniform" />
+        <!--  The layer the nozzle is on  -->
+        <Rectangle
+            x:Name="Head"
+            Height="2"
+            VerticalAlignment="Top"
+            AutomationProperties.AccessibilityView="Raw"
+            Fill="{ThemeResource AccentFillColorDefaultBrush}"
+            IsHitTestVisible="False"
+            RadiusX="1"
+            RadiusY="1"
+            Visibility="Collapsed" />
+    </Grid>
+</UserControl>
