@@ -24,11 +24,11 @@ public partial class App : Application
     // Startup leaves JIT and first-request state behind that the idle app never touches again.
     private static readonly TimeSpan StartupTrimDelay = TimeSpan.FromSeconds(30);
 
-    private readonly TrayIconRenderer _trayRenderer = new();
     private Mutex? _singleInstanceMutex;
     private EventWaitHandle? _showEvent;
     private RegisteredWaitHandle? _showWait;
     private TrayIcon? _trayIcon;
+    private TrayIconRenderer? _trayRenderer;
     private TrayFlyoutWindow? _flyout;
     private DispatcherQueue? _dispatcher;
     private PrinterHub? _hub;
@@ -137,10 +137,11 @@ public partial class App : Application
         _trayIcon.Selected += (_, _) => EnsureFlyout().Toggle();
         _trayIcon.ContextMenu += TrayIcon_ContextMenu;
         _trayIcon.IsVisible = true;
+        _trayRenderer = new TrayIconRenderer(_trayIcon, DispatcherQueue.GetForCurrentThread());
         WindowPlacementService.SetTrayIcon(_trayIcon);
         SystemThemeService.Changed += (_, _) => _dispatcher?.TryEnqueue(() =>
         {
-            _trayRenderer.Invalidate();
+            _trayRenderer?.Invalidate();
             UpdateTrayIcon();
         });
     }
@@ -152,13 +153,13 @@ public partial class App : Application
     /// <summary>Redraws the tray icon and tooltip from every printer's latest status.</summary>
     private void UpdateTrayIcon()
     {
-        if (_trayIcon is null || _hub is null)
+        if (_trayIcon is null || _trayRenderer is null || _hub is null)
         {
             return;
         }
 
         TrayIndicator indicator = TrayIndicator.Compute(_hub.Statuses, DisplayName);
-        _trayRenderer.Show(_trayIcon, indicator, SystemThemeService.IsLight, TrayIconPath);
+        _trayRenderer.Show(indicator, SystemThemeService.IsLight, TrayIconPath);
         _trayIcon.Tooltip = indicator.Tooltip;
     }
 
@@ -244,6 +245,9 @@ public partial class App : Application
         _isExiting = true;
         _flyout?.CloseWindow();
 
+        // Stop the marquee first, so no frame lands on a disposed icon.
+        _trayRenderer?.Dispose();
+        _trayRenderer = null;
         if (_trayIcon is not null)
         {
             _trayIcon.IsVisible = false;
@@ -251,7 +255,6 @@ public partial class App : Application
             _trayIcon = null;
         }
 
-        _trayRenderer.Release();
         NotificationService.Unregister();
         _showWait?.Unregister(null);
         _showEvent?.Dispose();

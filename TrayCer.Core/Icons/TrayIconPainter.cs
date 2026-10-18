@@ -28,10 +28,11 @@ public enum BadgeSymbol
 }
 
 /// <summary>
-/// Draws the dynamic tray icons as ARGB pixels: a percentage over a progress bar, pause bars, and
-/// round badges. Shapes are signed-distance fields sampled at pixel centers, which anti-aliases
-/// them without a graphics library. Text arrives as coverage rendered by the app in the system
-/// font; a built-in pixel font stands in when that fails (and in tests).
+/// Draws the dynamic tray icons as ARGB pixels: a percentage over a progress bar, pause bars,
+/// round badges, and frames of text scrolling across a plate. Shapes are signed-distance fields
+/// sampled at pixel centers, which anti-aliases them without a graphics library. Text arrives as
+/// coverage rendered by the app in the system font; a built-in pixel font stands in for digits
+/// when that fails (and in tests).
 /// </summary>
 public static class TrayIconPainter
 {
@@ -93,6 +94,43 @@ public static class TrayIconPainter
             Fill(pixels, size, foreground, (x, y) => Math.Min(
                 Segment(x, y, center, size * 0.25, center, size * 0.56) - half,
                 Circle(x, y, center, size * 0.75, Math.Max(1, size * 0.09))));
+        }
+
+        return pixels;
+    }
+
+    /// <summary>How tall a capital plus a descender stands in a marquee: a little under the icon, so the plate frames the text.</summary>
+    public static int MarqueeLineHeight(int size) => Math.Max(5, (int)Math.Round(size * 0.8));
+
+    /// <summary>
+    /// Scroll positions in one pass of a marquee <paramref name="textWidth"/> wide: the text enters
+    /// at the right edge and leaves at the left, so a pass is its width plus one icon of bare plate.
+    /// </summary>
+    public static int MarqueeFrames(int size, int textWidth) => textWidth + size;
+
+    /// <summary>A rounded square plate with the text scrolled to <paramref name="position"/> (0 to <see cref="MarqueeFrames"/>-1), clipped to the plate.</summary>
+    /// <param name="text">Coverage (0-255) for a strip <paramref name="textWidth"/> wide and <paramref name="size"/> tall.</param>
+    public static uint[] Marquee(int size, ReadOnlySpan<byte> text, int textWidth, int position, uint background, uint foreground)
+    {
+        ArgumentOutOfRangeException.ThrowIfNotEqual(text.Length, textWidth * size, nameof(text));
+
+        uint[] pixels = new uint[size * size];
+        double radius = size * 0.2;
+        int offset = position - size; // Column of the strip under the icon's left edge.
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                double plate = Math.Clamp(0.5 - RoundedRect(x + 0.5, y + 0.5, 0, 0, size, size, radius), 0, 1);
+                if (plate <= 0)
+                {
+                    continue;
+                }
+
+                int column = offset + x;
+                double ink = column >= 0 && column < textWidth ? text[(y * textWidth) + column] / 255.0 : 0;
+                pixels[(y * size) + x] = Over(0, Over(background, foreground, ink), plate);
+            }
         }
 
         return pixels;

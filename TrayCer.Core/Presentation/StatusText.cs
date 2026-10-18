@@ -7,6 +7,9 @@ namespace TrayCer.Core.Presentation;
 /// <summary>The words for a printer's state, shared by the cards, the tooltip and notifications.</summary>
 public static class StatusText
 {
+    /// <summary>Between printers in the tray marquee: a full bullet, spaced wide, since a middle dot is a single pixel at 16 px.</summary>
+    public const string MarqueeSeparator = "   •   ";
+
     public static string StateLabel(PrinterState state) => state switch
     {
         PrinterState.Offline => "Offline",
@@ -117,6 +120,10 @@ public static class StatusText
             _ => $"{name}: {StateLabel(snapshot.State)}",
         };
     }
+
+    /// <summary>What scrolls across the green tray icon: "Voron done   •   P1S done".</summary>
+    public static string Marquee(IEnumerable<PrinterStatus> finished) =>
+        string.Join(MarqueeSeparator, finished.Select(p => $"{p.Config.Name} done"));
 
     /// <summary>Title and body for a notification about <paramref name="printEvent"/>; null for events not worth one.</summary>
     public static (string Title, string Body)? Notification(string printerName, PrintEvent printEvent)

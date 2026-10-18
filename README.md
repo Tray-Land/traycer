@@ -1,10 +1,10 @@
 # Traycer
 
-![Tray icon states: a percentage over a progress bar, yellow pause bars, a green check, a red exclamation mark](docs/tray-states.png)
+![Tray icon states: a percentage over a progress bar, yellow pause bars, a green tile with a printer's name scrolling across it, a red exclamation mark](docs/tray-states.png)
 
 Glance at the tray to see how your 3D prints are going, and whether anything has finished.
 
-Traycer is a WinUI 3 app that lives in the Windows notification area. It watches the printers on your network and draws the state of the most pressing one right on its tray icon: the percentage of the print that will finish first, pause bars when a print is waiting, a green check when a print is done and waiting for you, and a red mark when something failed. Click the icon for a card per printer.
+Traycer is a WinUI 3 app that lives in the Windows notification area. It watches the printers on your network and draws the state of the most pressing one right on its tray icon: the percentage of the print that will finish first, pause bars when a print is waiting, a green tile with the printer's name scrolling across it when a print is done and waiting for you, and a red mark when something failed. Click the icon for a card per printer.
 
 ## Supported printers
 
@@ -28,7 +28,7 @@ Traycer talks to each printer the way its own software does, on your local netwo
 
 ## Features
 
-- **Tray icon:** one icon for all your printers, most urgent first: a failed print or printer error (red !), a printer waiting on you (amber !), a finished print you haven't marked complete (green check), a paused print (pause bars over its progress), then the percentage of the print that will finish soonest. With nothing going on, it's the plain app icon. It follows the taskbar's light or dark theme and renders at your display's DPI.
+- **Tray icon:** one icon for all your printers, most urgent first: a failed print or printer error (red !), a printer waiting on you (amber !), a finished print you haven't marked complete (a green tile with `Voron done` scrolling across it, naming every printer that's done), a paused print (pause bars over its progress), then the percentage of the print that will finish soonest. With nothing going on, it's the plain app icon. It follows the taskbar's light or dark theme and renders at your display's DPI.
 - **Tooltip:** a line per printer that has news, like `P1S: Finished` or `Voron: 45% · 1h 20m left`.
 - **Cards:** the flyout has a card per printer: name, state, job name, progress bar, time left and the clock time it should be done, layer, temperatures, the printer's own status message, and a preview image when the printer serves one.
 - **Details:** click a card for everything the printer reports, grouped into temperatures (with targets), details (speed, filament, nozzle and so on) and the printer itself. Open its web interface (Mainsail, Fluidd, OctoPrint, PrusaLink, Duet Web Control), edit it or remove it.
@@ -66,6 +66,7 @@ Windows puts a new app's tray icon in the overflow (^). Since the icon is the po
 - **Certificates.** Printers that use TLS present certificates Windows can't verify (Bambu Lab's come from Bambu's own authority). Traycer accepts them for Bambu's MQTT connection, and for HTTPS only when the address is a private IP or a `.local`/`.lan` name.
 - **Polling.** The tray icon is the reason Traycer keeps watching with no window open. A printing printer is checked every 15 seconds (configurable), an idle one once a minute, and an unreachable one backs off to every five minutes. Bambu, Creality and Elegoo printers keep a connection open while they print and drop it while idle, checking back every three minutes.
 - **Memory.** The flyout is hidden when dismissed and closed a minute later, then the app returns its memory to Windows.
+- **Animation.** The scrolling tray icon redraws about 18 times a second, and only while a finished print waits to be marked complete. Each frame is cut from text rendered once, so it costs well under 1% of one CPU core.
 
 ## Build from source
 

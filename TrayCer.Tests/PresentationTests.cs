@@ -52,7 +52,9 @@ public sealed class PresentationTests
         PrinterStatus failed = Status("D", PrinterState.Error, attention: AttentionLevel.Error);
 
         Assert.AreEqual(TrayGlyph.Error, TrayIndicator.Compute([printing, paused, done, failed], "Traycer").Glyph);
-        Assert.AreEqual(TrayGlyph.Done, TrayIndicator.Compute([printing, paused, done], "Traycer").Glyph);
+        TrayIndicator doneIcon = TrayIndicator.Compute([printing, paused, done], "Traycer");
+        Assert.AreEqual(TrayGlyph.Done, doneIcon.Glyph);
+        Assert.AreEqual("C done", doneIcon.Marquee);
         Assert.AreEqual(TrayGlyph.Paused, TrayIndicator.Compute([printing, paused, done with { NeedsMarkComplete = false }], "Traycer").Glyph, "Marked complete: back to normal.");
         TrayIndicator pausedIcon = TrayIndicator.Compute([printing, paused], "Traycer");
         Assert.AreEqual(TrayGlyph.Paused, pausedIcon.Glyph);
@@ -69,6 +71,19 @@ public sealed class PresentationTests
         PrinterStatus unknown = Status("Unknown", PrinterState.Printing, 0.95);
 
         Assert.AreEqual(0.2, TrayIndicator.Compute([slow, unknown, soon], "Traycer").Progress);
+    }
+
+    [TestMethod]
+    public void Marquee_NamesEveryFinishedPrinter_EvenOffline()
+    {
+        PrinterStatus voron = Status("Voron", PrinterState.Idle, needsMarkComplete: true);
+        PrinterStatus p1s = Status("P1S", PrinterState.Finished, 1, needsMarkComplete: true) with { Connection = ConnectionState.Unreachable };
+        PrinterStatus other = Status("Ender", PrinterState.Printing, 0.3);
+
+        TrayIndicator indicator = TrayIndicator.Compute([voron, other, p1s], "Traycer");
+
+        Assert.AreEqual(TrayGlyph.Done, indicator.Glyph);
+        Assert.AreEqual("Voron done   •   P1S done", indicator.Marquee, "The print is still on the plate while the printer is off.");
     }
 
     [TestMethod]

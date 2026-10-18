@@ -63,6 +63,33 @@ public sealed class IconTests
     }
 
     [TestMethod]
+    [DataRow(16)]
+    [DataRow(24)]
+    public void Marquee_ScrollsTextRightToLeftAcrossARoundedPlate(int size)
+    {
+        // A one-column strip, fully inked: easy to follow across the frames.
+        byte[] text = [.. Enumerable.Repeat((byte)255, size)];
+        uint plate = TrayPalette.Dark.Success;
+        uint ink = TrayPalette.Dark.OnSuccess;
+        int middle = size / 2;
+
+        Assert.AreEqual(size + 1, TrayIconPainter.MarqueeFrames(size, 1), "A pass is the text plus one icon of bare plate.");
+
+        uint[] first = TrayIconPainter.Marquee(size, text, 1, 0, plate, ink);
+        Assert.IsTrue(first.All(p => p == 0 || (p & 0xFFFFFF) == (plate & 0xFFFFFF)), "The pass starts on bare plate.");
+        Assert.AreEqual(0u, At(first, size, 0, 0), "Rounded corners are transparent.");
+        Assert.AreEqual(plate, At(first, size, 0, middle), "The plate fills the icon edge to edge.");
+
+        uint[] halfway = TrayIconPainter.Marquee(size, text, 1, middle, plate, ink);
+        Assert.AreEqual(ink, At(halfway, size, size - middle, middle), "The column entered from the right.");
+        Assert.AreEqual(plate, At(halfway, size, size - middle - 1, middle));
+
+        uint[] last = TrayIconPainter.Marquee(size, text, 1, size, plate, ink);
+        Assert.AreEqual(ink, At(last, size, 0, middle), "And leaves at the left.");
+        Assert.AreEqual(0u, At(last, size, 0, 0), "Text is clipped to the plate.");
+    }
+
+    [TestMethod]
     public void Paused_DrawsTwoBarsInCaution()
     {
         const int size = 20;

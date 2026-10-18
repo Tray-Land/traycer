@@ -14,7 +14,10 @@ public enum TrayGlyph
     /// <summary>Pause bars over a progress bar.</summary>
     Paused,
 
-    /// <summary>A green check: a print finished and hasn't been marked complete.</summary>
+    /// <summary>
+    /// A green plate with <see cref="TrayIndicator.Marquee"/> scrolling across it: a print finished
+    /// and hasn't been marked complete. A green check when the text can't be drawn.
+    /// </summary>
     Done,
 
     /// <summary>An amber "!": a printer is waiting on the user.</summary>
@@ -25,7 +28,8 @@ public enum TrayGlyph
 }
 
 /// <summary>What the tray icon shows for the whole fleet, and the tooltip under it.</summary>
-public sealed record TrayIndicator(TrayGlyph Glyph, double? Progress, string Tooltip)
+/// <param name="Marquee">For <see cref="TrayGlyph.Done"/>, the text that scrolls across the plate.</param>
+public sealed record TrayIndicator(TrayGlyph Glyph, double? Progress, string Tooltip, string? Marquee = null)
 {
     public const int MaxTooltipLength = 127; // NOTIFYICONDATA.szTip
 
@@ -47,9 +51,10 @@ public sealed record TrayIndicator(TrayGlyph Glyph, double? Progress, string Too
             return new TrayIndicator(TrayGlyph.Warning, null, tooltip);
         }
 
-        if (printers.Any(p => p.NeedsMarkComplete))
+        List<PrinterStatus> finished = [.. printers.Where(p => p.NeedsMarkComplete)];
+        if (finished.Count > 0)
         {
-            return new TrayIndicator(TrayGlyph.Done, null, tooltip);
+            return new TrayIndicator(TrayGlyph.Done, null, tooltip, StatusText.Marquee(finished));
         }
 
         PrinterStatus? paused = printers.FirstOrDefault(p => p.HasReading && p.Snapshot!.State is PrinterState.Paused or PrinterState.Attention);
