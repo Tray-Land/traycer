@@ -45,7 +45,9 @@ Traycer talks to each printer the way its own software does, on your local netwo
 
 ## Install
 
-Traycer isn't in the Microsoft Store yet. Build it from source (below), or install an MSIX from the GitHub releases page when one is published; sideloaded MSIX packages need their signing certificate trusted first.
+Download and open **[TrayCer.appinstaller](https://github.com/Tray-Land/traycer/releases/latest/download/TrayCer.appinstaller)** with Windows App Installer. The link works once the first release is published; until then, build from source (below).
+
+Windows picks the right build for your PC (x64 or ARM64), installs the Windows App Runtime if it's missing, and keeps Traycer up to date from the newest stable release: it checks when the app starts and in the background, and downloads only the parts of the package that changed.
 
 Requires Windows 10 1809 (build 17763) or later, or Windows 11, on x64 or ARM64.
 
@@ -93,7 +95,9 @@ The addresses, serial numbers and codes are at the top of the file. Steer the sc
 
 ### Releases
 
-`build-msix-for-gh.ps1` builds signed x64 and ARM64 MSIX packages and drafts a GitHub release.
+Bump `Identity/@Version` in `Package.appxmanifest`, commit and push, then run `build-msix-for-gh.ps1`. It builds x64 and ARM64 packages, bundles them into one signed `.msixbundle`, writes the `TrayCer.appinstaller` feed, checks the bundle, and creates a draft GitHub release. The feed's `latest/download` link starts working when you publish the draft as the latest (non-pre-release) release.
+
+Publish the draft without changing its tag (the feed's addresses contain it), then run `.\build-msix-for-gh.ps1 -VerifyPublished` to check the live feed and its download links. `.\build-msix-for-gh.ps1 -SkipRelease -NoSign -OutputRoot <folder>` checks the whole build without signing. The script is a copy of the `winui-tray-app` skill's; fix it there and recopy.
 
 ## Project layout
 
