@@ -10,6 +10,7 @@ This is a tray-only WinUI 3 app built from the `winui-tray-app` skill scaffold o
 - **Closing must actually free the window.** `CloseWindow` unsubscribes every `DispatcherQueueTimer.Tick` and calls `WindowManager.Get(this).Dispose()`: WinUIEx 2.9.3 never disposes the manager a `WindowEx` creates, and its AppWindow and timer subscriptions keep every closed flyout alive (a plain `Window` is collected; a `WindowEx` isn't). To check, hold a `WeakReference` to the closed window and confirm it dies after `MemoryService.ReleaseIdle`; `dotnet-dump`'s `gcroot` can't see these native holds.
 - Put pure decision logic (parsing, policies, formatting) in classes with no WinRT dependency, so a plain `net10.0` test project can cover it.
 - The repo is MIT licensed (`LICENSE`). Keep `README.md` in step with the features.
+- Releases: bump `Identity/@Version`, run `build-msix-for-gh.ps1`, publish the draft without changing its tag, then run `build-msix-for-gh.ps1 -VerifyPublished`. The script is a copy of the `winui-tray-app` skill's; fix it there and recopy, never here. Before the first release, run the skill's audit.
 
 ## Traycer specifics
 
